@@ -1,0 +1,56 @@
+<Window x:Class="DesktopPet.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Desktop Pet - Robot"
+        Width="256" Height="192"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="True"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        MouseDown="Window_MouseDown"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+    <Window.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
+            <Separator />
+            <MenuItem Header="Manual Actions">
+                <MenuItem Header="Kick Action (Space / Click)" Click="MenuKick_Click" />
+                <MenuItem Header="Punch Action (P)" Click="MenuPunch_Click" />
+                <MenuItem Header="Run Sprint (R)" Click="MenuRun_Click" />
+                <MenuItem Header="Idle Stance (I)" Click="MenuIdle_Click" />
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="Frame Rate">
+                <MenuItem Header="12 FPS (Half Speed)" Click="MenuFps12_Click" />
+                <MenuItem Header="24 FPS (Default / Standard)" Click="MenuFps24_Click" IsChecked="True" x:Name="MenuItemFps24" />
+                <MenuItem Header="30 FPS (Smooth)" Click="MenuFps30_Click" />
+                <MenuItem Header="48 FPS (Double Speed)" Click="MenuFps48_Click" />
+            </MenuItem>
+            <MenuItem Header="Pet Scale">
+                <MenuItem Header="Small (256x192)" Click="MenuScaleSmall_Click" IsChecked="True" x:Name="MenuItemScaleSmall" />
+                <MenuItem Header="Medium (384x288)" Click="MenuScaleMedium_Click" x:Name="MenuItemScaleMedium" />
+                <MenuItem Header="Original (512x384)" Click="MenuScaleOriginal_Click" x:Name="MenuItemScaleOriginal" />
+            </MenuItem>
+            <MenuItem Header="Always on Top" IsCheckable="True" IsChecked="True" Click="MenuTopmost_Click" x:Name="MenuItemTopmost" />
+            <Separator />
+            <MenuItem Header="Reset to Screen Center" Click="MenuResetPos_Click" />
+            <MenuItem Header="Exit Desktop Pet" Click="MenuExit_Click" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid Background="Transparent" ToolTip="Robot Pet: Roams, kicks, punches &amp; runs randomly! Left-click to kick. Drag to reposition.">
+        <Image x:Name="PetImage"
+               Stretch="Uniform"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               RenderOptions.BitmapScalingMode="HighQuality"
+               RenderTransformOrigin="0.5, 0.5">
+            <Image.RenderTransform>
+                <ScaleTransform x:Name="PetScaleTransform" ScaleX="1" ScaleY="1" />
+            </Image.RenderTransform>
+        </Image>
+    </Grid>
+</Window>
