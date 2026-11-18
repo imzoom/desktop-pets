@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Jay\\Demos\\dextop-pets\\desktop-pet-win\\DesktopPet.csproj": {}
+    "C:\\Jay\\CoreDemo\\desktop-pets\\desktop-pet-win\\DesktopPet.csproj": {}
   },
   "projects": {
-    "c:\\Jay\\Demos\\dextop-pets\\desktop-pet-win\\DesktopPet.csproj": {
+    "C:\\Jay\\CoreDemo\\desktop-pets\\desktop-pet-win\\DesktopPet.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Jay\\Demos\\dextop-pets\\desktop-pet-win\\DesktopPet.csproj",
+        "projectUniqueName": "C:\\Jay\\CoreDemo\\desktop-pets\\desktop-pet-win\\DesktopPet.csproj",
         "projectName": "DesktopPet",
-        "projectPath": "c:\\Jay\\Demos\\dextop-pets\\desktop-pet-win\\DesktopPet.csproj",
+        "projectPath": "C:\\Jay\\CoreDemo\\desktop-pets\\desktop-pet-win\\DesktopPet.csproj",
         "packagesPath": "C:\\Users\\Admin-PC\\.nuget\\packages\\",
-        "outputPath": "c:\\Jay\\Demos\\dextop-pets\\desktop-pet-win\\obj\\",
+        "outputPath": "C:\\Jay\\CoreDemo\\desktop-pets\\desktop-pet-win\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

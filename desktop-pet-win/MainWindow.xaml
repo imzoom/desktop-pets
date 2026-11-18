@@ -1,27 +1,31 @@
 <Window x:Class="DesktopPet.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Desktop Pet - Robot"
-        Width="256" Height="192"
+        Title="Desktop Pet - Character Studio"
+        Width="256" Height="256"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="True"
         ResizeMode="NoResize"
+        Focusable="True"
         WindowStartupLocation="Manual"
         MouseDown="Window_MouseDown"
-        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+        MouseLeftButtonUp="Window_MouseLeftButtonUp"
+        MouseDoubleClick="Window_MouseDoubleClick">
     <Window.ContextMenu>
         <ContextMenu>
-            <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
+            <MenuItem Header="🥷 Switch to Hooded Blade (Sword Master)" Click="MenuCharHoodedBlade_Click" IsChecked="True" x:Name="MenuItemCharHoodedBlade" FontWeight="Bold" />
+            <MenuItem Header="🤖 Switch to Robot Pet" Click="MenuCharRobot_Click" x:Name="MenuItemCharRobot" />
             <Separator />
-            <MenuItem Header="Manual Actions">
-                <MenuItem Header="Kick Action (Space / Click)" Click="MenuKick_Click" />
-                <MenuItem Header="Punch Action (P)" Click="MenuPunch_Click" />
-                <MenuItem Header="Run Sprint (R)" Click="MenuRun_Click" />
-                <MenuItem Header="Idle Stance (I)" Click="MenuIdle_Click" />
-            </MenuItem>
+            <MenuItem Header="⚡ Sword Power (Space / Click)" Click="MenuPower_Click" x:Name="MenuItemPower" FontWeight="Bold" />
+            <MenuItem Header="🗡️ Sword Slash (A)" Click="MenuAttack_Click" x:Name="MenuItemAttack" />
+            <MenuItem Header="🦘 Leap Jump (J)" Click="MenuJump_Click" x:Name="MenuItemJump" />
+            <MenuItem Header="🏃 Run Sprint (R)" Click="MenuRun_Click" />
+            <MenuItem Header="🧍 Idle Stance (I)" Click="MenuIdle_Click" />
+            <Separator />
+            <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
             <Separator />
             <MenuItem Header="Frame Rate">
                 <MenuItem Header="12 FPS (Half Speed)" Click="MenuFps12_Click" />
@@ -30,9 +34,9 @@
                 <MenuItem Header="48 FPS (Double Speed)" Click="MenuFps48_Click" />
             </MenuItem>
             <MenuItem Header="Pet Scale">
-                <MenuItem Header="Small (256x192)" Click="MenuScaleSmall_Click" IsChecked="True" x:Name="MenuItemScaleSmall" />
-                <MenuItem Header="Medium (384x288)" Click="MenuScaleMedium_Click" x:Name="MenuItemScaleMedium" />
-                <MenuItem Header="Original (512x384)" Click="MenuScaleOriginal_Click" x:Name="MenuItemScaleOriginal" />
+                <MenuItem Header="Small (256x256)" Click="MenuScaleSmall_Click" IsChecked="True" x:Name="MenuItemScaleSmall" />
+                <MenuItem Header="Medium (384x384)" Click="MenuScaleMedium_Click" x:Name="MenuItemScaleMedium" />
+                <MenuItem Header="Original (512x512)" Click="MenuScaleOriginal_Click" x:Name="MenuItemScaleOriginal" />
             </MenuItem>
             <MenuItem Header="Always on Top" IsCheckable="True" IsChecked="True" Click="MenuTopmost_Click" x:Name="MenuItemTopmost" />
             <Separator />
@@ -41,7 +45,7 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Grid Background="Transparent" ToolTip="Robot Pet: Roams, kicks, punches &amp; runs randomly! Left-click to kick. Drag to reposition.">
+    <Grid Background="Transparent" x:Name="RootGrid" ToolTip="Desktop Pet: Click for Sword Power! Double-click to switch character. Right-click for options.">
         <Image x:Name="PetImage"
                Stretch="Uniform"
                HorizontalAlignment="Center"

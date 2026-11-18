@@ -14,8 +14,6 @@ namespace DesktopPet
     {
         public int index { get; set; }
         public string file { get; set; } = string.Empty;
-        public int row { get; set; }
-        public int col { get; set; }
         public int groundBaseline { get; set; }
         public int pixelCount { get; set; }
     }
@@ -36,18 +34,28 @@ namespace DesktopPet
         internal List<BitmapImage> CachedBitmaps = new();
     }
 
+    public class CharacterData
+    {
+        public string id { get; set; } = string.Empty;
+        public string name { get; set; } = string.Empty;
+        public string description { get; set; } = string.Empty;
+        public string defaultAnimation { get; set; } = "idle";
+        public Dictionary<string, AnimationData> animations { get; set; } = new();
+    }
+
     public class AppConfig
     {
         public string version { get; set; } = string.Empty;
-        public string character { get; set; } = string.Empty;
-        public string defaultAnimation { get; set; } = "idle";
-        public Dictionary<string, AnimationData> animations { get; set; } = new();
+        public string defaultCharacter { get; set; } = "hooded-blade";
+        public Dictionary<string, CharacterData> characters { get; set; } = new();
+        public Dictionary<string, AnimationData>? animations { get; set; }
     }
 
     public partial class MainWindow : Window
     {
         private AppConfig? _config;
-        private readonly Dictionary<string, AnimationData> _animations = new();
+        private readonly Dictionary<string, CharacterData> _characters = new();
+        private CharacterData? _activeCharacter;
         private AnimationData? _currentAnimation;
         private int _sequenceIndex = 0;
         private readonly DispatcherTimer _timer = new();
@@ -71,7 +79,8 @@ namespace DesktopPet
         {
             InitializeComponent();
             Loaded += MainWindow_Loaded;
-            KeyDown += MainWindow_KeyDown;
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+            KeyDown += MainWindow_PreviewKeyDown;
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -83,32 +92,87 @@ namespace DesktopPet
             LoadAnimationConfig();
             SetupTimer();
 
-            // Start in idle and pick first autonomous action after short delay
-            _idleFramesRemaining = _rng.Next(30, 70);
-            PlayAnimation("idle");
+            // Default to Hooded Blade (Sword Master)
+            string startChar = _characters.ContainsKey("hooded-blade") ? "hooded-blade" : (_characters.Keys.FirstOrDefault() ?? "robot");
+            SwitchCharacter(startChar);
+
+            Focus();
+            Keyboard.Focus(this);
         }
 
-        private void MainWindow_KeyDown(object sender, KeyEventArgs e)
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Space || e.Key == Key.K)
+            HandleKey(e.Key);
+        }
+
+        private void HandleKey(Key key)
+        {
+            if (key == Key.C)
             {
-                TriggerManualAction("kick");
+                // Toggle character
+                string nextChar = (_activeCharacter?.id == "hooded-blade") ? "robot" : "hooded-blade";
+                SwitchCharacter(nextChar);
             }
-            else if (e.Key == Key.P)
+            else if (key == Key.Space || key == Key.S)
             {
-                TriggerManualAction("punch");
+                TriggerPrimaryAction();
             }
-            else if (e.Key == Key.R)
+            else if (key == Key.A)
+            {
+                TriggerSecondaryAction();
+            }
+            else if (key == Key.J)
+            {
+                TriggerJumpAction();
+            }
+            else if (key == Key.P)
+            {
+                if (_activeCharacter?.id == "robot") TriggerManualAction("punch");
+                else TriggerPrimaryAction();
+            }
+            else if (key == Key.R)
             {
                 TriggerManualAction("run");
             }
-            else if (e.Key == Key.I)
+            else if (key == Key.I)
             {
                 TriggerManualAction("idle");
             }
-            else if (e.Key == Key.Escape)
+            else if (key == Key.Escape)
             {
                 Close();
+            }
+        }
+
+        private void TriggerPrimaryAction()
+        {
+            if (_activeCharacter?.id == "hooded-blade")
+            {
+                TriggerManualAction("sword-power");
+            }
+            else
+            {
+                TriggerManualAction("kick");
+            }
+        }
+
+        private void TriggerSecondaryAction()
+        {
+            if (_activeCharacter?.id == "hooded-blade")
+            {
+                TriggerManualAction("attack");
+            }
+            else
+            {
+                TriggerManualAction("punch");
+            }
+        }
+
+        private void TriggerJumpAction()
+        {
+            if (_activeCharacter?.id == "hooded-blade")
+            {
+                TriggerManualAction("jump");
             }
         }
 
@@ -119,6 +183,40 @@ namespace DesktopPet
                 StartNewRunTarget();
             }
             PlayAnimation(animName);
+        }
+
+        public void SwitchCharacter(string characterId)
+        {
+            if (!_characters.TryGetValue(characterId, out var character)) return;
+
+            _activeCharacter = character;
+            bool isBlade = (characterId == "hooded-blade");
+
+            if (MenuItemCharHoodedBlade != null) MenuItemCharHoodedBlade.IsChecked = isBlade;
+            if (MenuItemCharRobot != null) MenuItemCharRobot.IsChecked = !isBlade;
+
+            // Update action menu headers
+            if (MenuItemPower != null)
+            {
+                MenuItemPower.Header = isBlade ? "⚡ Sword Power (Space / Click)" : "🥋 Kick Action (Space / Click)";
+            }
+            if (MenuItemAttack != null)
+            {
+                MenuItemAttack.Header = isBlade ? "🗡️ Sword Slash (A)" : "🥊 Punch Action (A / P)";
+            }
+            if (MenuItemJump != null)
+            {
+                MenuItemJump.Visibility = isBlade ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            Title = isBlade ? "Desktop Pet - Hooded Blade (Sword Master)" : "Desktop Pet - Robot Pet";
+
+            RootGrid.ToolTip = isBlade
+                ? "Hooded Blade: Click for Sword Power! Double-click to switch to Robot. Press 'C' to switch."
+                : "Robot Pet: Click to Kick! Double-click to switch to Hooded Blade. Press 'C' to switch.";
+
+            _idleFramesRemaining = _rng.Next(25, 60);
+            PlayAnimation(_activeCharacter.defaultAnimation);
         }
 
         private void LoadAnimationConfig()
@@ -151,13 +249,35 @@ namespace DesktopPet
             string json = File.ReadAllText(configPath);
             _config = JsonSerializer.Deserialize<AppConfig>(json);
 
-            if (_config?.animations == null) return;
+            if (_config == null) return;
 
-            foreach (var kvp in _config.animations)
+            // Load multi-character structure
+            if (_config.characters != null && _config.characters.Count > 0)
             {
-                var anim = kvp.Value;
-                anim.name = kvp.Key;
+                foreach (var (charId, character) in _config.characters)
+                {
+                    character.id = charId;
+                    CacheCharacterBitmaps(character);
+                    _characters[charId] = character;
+                }
+            }
+            else if (_config.animations != null)
+            {
+                var fallbackChar = new CharacterData
+                {
+                    id = "default",
+                    name = "Desktop Pet",
+                    animations = _config.animations
+                };
+                CacheCharacterBitmaps(fallbackChar);
+                _characters["default"] = fallbackChar;
+            }
+        }
 
+        private void CacheCharacterBitmaps(CharacterData character)
+        {
+            foreach (var (_, anim) in character.animations)
+            {
                 string framesDir = Path.Combine(_baseDirectory, anim.framesDir);
                 if (Directory.Exists(framesDir))
                 {
@@ -176,8 +296,6 @@ namespace DesktopPet
                         anim.CachedBitmaps.Add(bitmap);
                     }
                 }
-
-                _animations[kvp.Key] = anim;
             }
         }
 
@@ -188,7 +306,7 @@ namespace DesktopPet
 
         public void PlayAnimation(string name, double? customFps = null)
         {
-            if (!_animations.TryGetValue(name, out var anim))
+            if (_activeCharacter == null || !_activeCharacter.animations.TryGetValue(name, out var anim))
             {
                 return;
             }
@@ -212,7 +330,6 @@ namespace DesktopPet
         {
             if (_currentAnimation == null || _currentAnimation.CachedBitmaps.Count == 0) return;
 
-            // Handle Autonomous movement & state changes if autonomous mode is ON
             if (_isAutonomous && !_userIsDragging)
             {
                 HandleAutonomousBehavior();
@@ -231,7 +348,6 @@ namespace DesktopPet
             }
             else
             {
-                // Reached end of animation sequence
                 if (_currentAnimation.loop)
                 {
                     _sequenceIndex = 0;
@@ -239,11 +355,8 @@ namespace DesktopPet
                 }
                 else
                 {
-                    // Action completed (e.g. kick, punch)
-                    // After completing a kick or punch, transition back to idle
-                    // and schedule next autonomous action
                     string next = _currentAnimation.nextAnimation ?? "idle";
-                    _idleFramesRemaining = _rng.Next(30, 80); // 1.2 - 3.3 seconds of idle before next action
+                    _idleFramesRemaining = _rng.Next(25, 75);
                     PlayAnimation(next);
                 }
             }
@@ -258,10 +371,10 @@ namespace DesktopPet
             double maxY = Math.Max(10, workArea.Height - Height - 10);
 
             string current = _currentAnimation?.name ?? "idle";
+            bool isBlade = (_activeCharacter?.id == "hooded-blade");
 
             if (current == "run")
             {
-                // Move robot towards target location
                 double dx = _targetX - Left;
                 double dy = _targetY - Top;
                 double dist = Math.Sqrt(dx * dx + dy * dy);
@@ -270,34 +383,38 @@ namespace DesktopPet
                 {
                     _runFramesRemaining--;
 
-                    // Step towards target
                     double stepX = Math.Sign(dx) * Math.Min(Math.Abs(dx), _moveSpeedX);
                     double stepY = Math.Sign(dy) * Math.Min(Math.Abs(dy), _moveSpeedY);
 
-                    // Face the movement direction
-                    if (stepX < -0.5) SetFacing(true);   // Face left
-                    else if (stepX > 0.5) SetFacing(false); // Face right
+                    if (stepX < -0.5) SetFacing(true);
+                    else if (stepX > 0.5) SetFacing(false);
 
                     Left = Math.Clamp(Left + stepX, minX, maxX);
                     Top = Math.Clamp(Top + stepY, minY, maxY);
                 }
                 else
                 {
-                    // Finished running to destination! Pick a random follow-up action:
-                    // Kick (40%), Punch (40%), or Rest/Idle (20%)
                     int roll = _rng.Next(100);
-                    if (roll < 40)
+                    if (isBlade)
                     {
-                        PlayAnimation("kick");
-                    }
-                    else if (roll < 80)
-                    {
-                        PlayAnimation("punch");
+                        if (roll < 45) PlayAnimation("sword-power");
+                        else if (roll < 75) PlayAnimation("attack");
+                        else if (roll < 90) PlayAnimation("jump");
+                        else
+                        {
+                            _idleFramesRemaining = _rng.Next(35, 80);
+                            PlayAnimation("idle");
+                        }
                     }
                     else
                     {
-                        _idleFramesRemaining = _rng.Next(40, 90);
-                        PlayAnimation("idle");
+                        if (roll < 45) PlayAnimation("kick");
+                        else if (roll < 80) PlayAnimation("punch");
+                        else
+                        {
+                            _idleFramesRemaining = _rng.Next(35, 80);
+                            PlayAnimation("idle");
+                        }
                     }
                 }
             }
@@ -306,27 +423,24 @@ namespace DesktopPet
                 _idleFramesRemaining--;
                 if (_idleFramesRemaining <= 0)
                 {
-                    // Idle time expired! Choose next random action:
-                    // 55% Run to new random place on screen
-                    // 25% Random Kick
-                    // 20% Random Punch
                     int roll = _rng.Next(100);
-                    if (roll < 55)
+                    if (roll < 50)
                     {
                         StartNewRunTarget();
                         PlayAnimation("run");
                     }
-                    else if (roll < 80)
+                    else if (isBlade)
                     {
-                        // Randomly choose facing direction for kick
                         SetFacing(_rng.Next(2) == 0);
-                        PlayAnimation("kick");
+                        if (roll < 75) PlayAnimation("sword-power");
+                        else if (roll < 90) PlayAnimation("attack");
+                        else PlayAnimation("jump");
                     }
                     else
                     {
-                        // Randomly choose facing direction for punch
                         SetFacing(_rng.Next(2) == 0);
-                        PlayAnimation("punch");
+                        if (roll < 75) PlayAnimation("kick");
+                        else PlayAnimation("punch");
                     }
                 }
             }
@@ -337,18 +451,16 @@ namespace DesktopPet
             var workArea = SystemParameters.WorkArea;
             double minX = 20;
             double maxX = Math.Max(20, workArea.Width - Width - 20);
-            double minY = Math.Max(20, workArea.Height * 0.2); // Wander across bottom 80% of screen
+            double minY = Math.Max(20, workArea.Height * 0.2);
             double maxY = Math.Max(20, workArea.Height - Height - 20);
 
-            // Pick a random location on screen
             _targetX = _rng.NextDouble() * (maxX - minX) + minX;
             _targetY = _rng.NextDouble() * (maxY - minY) + minY;
 
-            // Randomize running speed slightly for natural movement
-            _moveSpeedX = _rng.NextDouble() * 3.5 + 4.5; // 4.5 to 8 px per frame
-            _moveSpeedY = _rng.NextDouble() * 2.0 + 1.0; // 1 to 3 px per frame
+            _moveSpeedX = _rng.NextDouble() * 3.5 + 4.5;
+            _moveSpeedY = _rng.NextDouble() * 2.0 + 1.0;
 
-            _runFramesRemaining = _rng.Next(45, 120); // 2 to 5 seconds of running
+            _runFramesRemaining = _rng.Next(45, 120);
         }
 
         private void SetFacing(bool faceLeft)
@@ -376,6 +488,9 @@ namespace DesktopPet
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            Focus();
+            Keyboard.Focus(this);
+
             if (e.ChangedButton == MouseButton.Left)
             {
                 _userIsDragging = true;
@@ -385,20 +500,38 @@ namespace DesktopPet
             }
         }
 
+        private void Window_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                // Double-click instantly toggles character!
+                string nextChar = (_activeCharacter?.id == "hooded-blade") ? "robot" : "hooded-blade";
+                SwitchCharacter(nextChar);
+            }
+        }
+
         private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             _userIsDragging = false;
             var endPoint = e.GetPosition(this);
             double dist = (endPoint - _dragStartPoint).Length;
 
-            // If it was a quick click without dragging, trigger kick action!
             if (dist < 6)
             {
-                PlayAnimation("kick");
+                TriggerPrimaryAction();
             }
         }
 
         // Context Menu Event Handlers
+        private void MenuCharHoodedBlade_Click(object sender, RoutedEventArgs e) => SwitchCharacter("hooded-blade");
+        private void MenuCharRobot_Click(object sender, RoutedEventArgs e) => SwitchCharacter("robot");
+
+        private void MenuPower_Click(object sender, RoutedEventArgs e) => TriggerPrimaryAction();
+        private void MenuAttack_Click(object sender, RoutedEventArgs e) => TriggerSecondaryAction();
+        private void MenuJump_Click(object sender, RoutedEventArgs e) => TriggerJumpAction();
+        private void MenuRun_Click(object sender, RoutedEventArgs e) => TriggerManualAction("run");
+        private void MenuIdle_Click(object sender, RoutedEventArgs e) => TriggerManualAction("idle");
+
         private void MenuAutonomous_Click(object sender, RoutedEventArgs e)
         {
             _isAutonomous = MenuItemAutonomous.IsChecked;
@@ -407,11 +540,6 @@ namespace DesktopPet
                 PlayAnimation("idle");
             }
         }
-
-        private void MenuKick_Click(object sender, RoutedEventArgs e) => TriggerManualAction("kick");
-        private void MenuPunch_Click(object sender, RoutedEventArgs e) => TriggerManualAction("punch");
-        private void MenuRun_Click(object sender, RoutedEventArgs e) => TriggerManualAction("run");
-        private void MenuIdle_Click(object sender, RoutedEventArgs e) => TriggerManualAction("idle");
 
         private void MenuFps12_Click(object sender, RoutedEventArgs e) => SetFpsPreset(12);
         private void MenuFps24_Click(object sender, RoutedEventArgs e) => SetFpsPreset(24);
@@ -428,20 +556,9 @@ namespace DesktopPet
             }
         }
 
-        private void MenuScaleSmall_Click(object sender, RoutedEventArgs e)
-        {
-            SetScale(256, 192, MenuItemScaleSmall);
-        }
-
-        private void MenuScaleMedium_Click(object sender, RoutedEventArgs e)
-        {
-            SetScale(384, 288, MenuItemScaleMedium);
-        }
-
-        private void MenuScaleOriginal_Click(object sender, RoutedEventArgs e)
-        {
-            SetScale(512, 384, MenuItemScaleOriginal);
-        }
+        private void MenuScaleSmall_Click(object sender, RoutedEventArgs e) => SetScale(256, 256, MenuItemScaleSmall);
+        private void MenuScaleMedium_Click(object sender, RoutedEventArgs e) => SetScale(384, 384, MenuItemScaleMedium);
+        private void MenuScaleOriginal_Click(object sender, RoutedEventArgs e) => SetScale(512, 512, MenuItemScaleOriginal);
 
         private void SetScale(double width, double height, System.Windows.Controls.MenuItem selectedItem)
         {

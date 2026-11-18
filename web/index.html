@@ -3,25 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Desktop Pet - Robot Character Animation Controller</title>
+  <title>Desktop Pet - Character Studio &amp; Sword Power</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
     <div class="header-title">
       <h1>
-        🤖 Desktop Pet Animation Controller
+        🤖 Desktop Pet Studio
         <span class="badge" id="currentAnimBadge">IDLE</span>
       </h1>
-      <p>Multi-Action Sprite System with Smooth State Transitions & Transparency</p>
+      <p>Multi-Character Sprite System with Sword Power &amp; Autonomous Roaming</p>
     </div>
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <label for="bgSelect" style="font-size: 0.8rem; color: var(--text-muted);">Backdrop:</label>
-      <select id="bgSelect" style="background: #334155; color: #fff; border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px;">
-        <option value="bg-dark">Dark Workspace</option>
-        <option value="bg-checker">Alpha Checkerboard</option>
-        <option value="bg-desktop">Desktop Wallpaper</option>
-      </select>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <label for="charSelect" style="font-size: 0.8rem; color: var(--text-muted);">Character:</label>
+        <select id="charSelect" style="background: #1e3a8a; color: #fff; border: 1px solid var(--accent); padding: 5px 10px; border-radius: 6px; font-weight: 600;">
+          <option value="hooded-blade">🥷 Hooded Blade (Sword Master)</option>
+          <option value="robot">🤖 Robot Pet</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <label for="bgSelect" style="font-size: 0.8rem; color: var(--text-muted);">Backdrop:</label>
+        <select id="bgSelect" style="background: #334155; color: #fff; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px;">
+          <option value="bg-dark">Dark Workspace</option>
+          <option value="bg-checker">Alpha Checkerboard</option>
+          <option value="bg-desktop">Desktop Wallpaper</option>
+        </select>
+      </div>
     </div>
   </header>
 
@@ -35,14 +44,14 @@
           <button id="btnStepNext" style="padding: 6px 10px;">Step ⏭</button>
         </div>
         <div style="font-size: 0.85rem; color: var(--text-muted);">
-          Frame: <strong id="lblFrame" style="color: #fff;">0 / 35</strong> |
+          Frame: <strong id="lblFrame" style="color: #fff;">0 / 32</strong> |
           Time: <strong id="lblTime" style="color: #fff;">0.0s</strong>
         </div>
       </div>
 
       <div class="stage-wrapper bg-dark" id="stageWrapper">
-        <canvas id="petCanvas" width="512" height="384"></canvas>
-        <div class="stage-hint">💡 Click character to Kick! Drag to position. Right-click or use panel for actions.</div>
+        <canvas id="petCanvas" width="512" height="512"></canvas>
+        <div class="stage-hint">💡 Click character for Sword Power! Drag to move. 'C' to toggle character.</div>
       </div>
     </div>
 
@@ -54,22 +63,11 @@
           <span>Character Actions</span>
           <span style="font-size: 0.75rem; color: var(--text-muted);">Click to trigger</span>
         </div>
-        <div class="action-buttons">
-          <button id="btnActKick" class="primary">
-            🥋 Kick Action
-          </button>
-          <button id="btnActIdle" class="active-anim">
-            🧍 Idle Stance
-          </button>
-          <button id="btnActPunch">
-            🥊 Punch Action
-          </button>
-          <button id="btnActRun">
-            🏃 Run Sprint
-          </button>
+        <div class="action-buttons" id="actionButtonsContainer">
+          <!-- Populated dynamically based on selected character -->
         </div>
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
-          * Note: <strong>Kick</strong> and <strong>Punch</strong> are one-shot actions that smoothly transition back to <strong>Idle</strong> upon completion.
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;" id="actionHint">
+          * Note: <strong>Sword Power</strong> unleashes an emerald shockwave and returns to <strong>Idle</strong>.
         </p>
       </div>
 
@@ -90,15 +88,15 @@
         <div class="form-group">
           <div class="form-label">
             <span>Pet Scale</span>
-            <span id="lblScale">0.5x (Small: 256x192)</span>
+            <span id="lblScale">0.5x (Small: 256x256)</span>
           </div>
-          <input type="range" id="sliderScale" min="0.5" max="1.5" step="0.1" value="0.5">
+          <input type="range" id="sliderScale" min="0.3" max="1.5" step="0.1" value="0.5">
         </div>
 
         <div class="form-group">
           <label class="checkbox-label" style="font-weight: 600; color: var(--accent);">
             <input type="checkbox" id="chkAutonomous" checked>
-            <span>Autonomous Roaming (Random Wander, Kick, Punch)</span>
+            <span>Autonomous Roaming (Random Wander, Slash, Power)</span>
           </label>
         </div>
 
@@ -112,7 +110,7 @@
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="chkDebug">
-            <span>Show Anchor & Boundary Inspection</span>
+            <span>Show Anchor &amp; Boundary Inspection</span>
           </label>
         </div>
       </div>
@@ -139,6 +137,10 @@
         </div>
         <table class="meta-table">
           <tr>
+            <td>Character:</td>
+            <td id="metaChar">Hooded Blade</td>
+          </tr>
+          <tr>
             <td>Active Animation:</td>
             <td id="metaAnim">idle</td>
           </tr>
@@ -148,15 +150,7 @@
           </tr>
           <tr>
             <td>Ground Baseline:</td>
-            <td id="metaBaseline">y = 320 px</td>
-          </tr>
-          <tr>
-            <td>Torso Anchor:</td>
-            <td id="metaAnchor">x = 220, y = 320</td>
-          </tr>
-          <tr>
-            <td>Content Bounding Box:</td>
-            <td id="metaBox">170 × 250 px</td>
+            <td id="metaBaseline">y = 465 px</td>
           </tr>
           <tr>
             <td>Alpha Channel:</td>
@@ -167,7 +161,6 @@
     </div>
   </main>
 
-  <!-- Load reusable animation controller -->
   <script src="../src/animation-controller.js"></script>
   <script src="app.js"></script>
 </body>
