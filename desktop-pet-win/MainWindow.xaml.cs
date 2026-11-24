@@ -53,6 +53,8 @@ namespace DesktopPet
 
     public partial class MainWindow : Window
     {
+        private enum RoamingPace { Chill, Active, Still }
+
         private AppConfig? _config;
         private readonly Dictionary<string, CharacterData> _characters = new();
         private CharacterData? _activeCharacter;
@@ -64,15 +66,17 @@ namespace DesktopPet
         private double _speedMultiplier = 1.0;
         private bool _userIsDragging = false;
 
-        // Autonomous AI Wandering & Random Actions
+        // Position & Pacing State (in WPF Device-Independent Pixels)
+        private double _currentPosX;
+        private double _currentPosY;
         private readonly Random _rng = new();
         private bool _isAutonomous = true;
-        private int _idleFramesRemaining = 60;
+        private RoamingPace _roamingPace = RoamingPace.Chill; // Default: Chill & Relaxed
+        private int _idleFramesRemaining = 200; // 8+ seconds of calm start
         private int _runFramesRemaining = 0;
         private double _targetX = 0;
         private double _targetY = 0;
-        private double _moveSpeedX = 5.0;
-        private double _moveSpeedY = 2.0;
+        private double _moveSpeed = 3.6;
         private bool _facingLeft = false;
 
         public MainWindow()
@@ -85,19 +89,59 @@ namespace DesktopPet
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            var workArea = SystemParameters.WorkArea;
-            Left = workArea.Right - Width - 80;
-            Top = workArea.Bottom - Height - 80;
+            try
+            {
+                // Guarantee pet starts clearly visible in bottom-right corner of user's primary screen
+                Left = SystemParameters.WorkArea.Right - Width - 80;
+                Top = SystemParameters.WorkArea.Bottom - Height - 80;
 
-            LoadAnimationConfig();
-            SetupTimer();
+                _currentPosX = Left;
+                _currentPosY = Top;
 
-            // Default to Hooded Blade (Sword Master)
-            string startChar = _characters.ContainsKey("hooded-blade") ? "hooded-blade" : (_characters.Keys.FirstOrDefault() ?? "robot");
-            SwitchCharacter(startChar);
+                LoadAnimationConfig();
+                SetupTimer();
 
-            Focus();
-            Keyboard.Focus(this);
+                string startChar = _characters.ContainsKey("hooded-blade") ? "hooded-blade" : (_characters.Keys.FirstOrDefault() ?? "robot");
+                SwitchCharacter(startChar);
+
+                Focus();
+                Keyboard.Focus(this);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in MainWindow_Loaded: {ex}");
+            }
+        }
+
+        private List<Rect> GetConnectedScreens()
+        {
+            var screens = new List<Rect>();
+
+            // 1. Primary screen in WPF DIP coordinates (guaranteed exact)
+            var primaryWork = new Rect(SystemParameters.WorkArea.Left, SystemParameters.WorkArea.Top,
+                                       SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height);
+            screens.Add(primaryWork);
+
+            // 2. Multi-monitor support across extended screens using WPF VirtualScreen coordinates
+            double vLeft = SystemParameters.VirtualScreenLeft;
+            double vWidth = SystemParameters.VirtualScreenWidth;
+            double vTop = SystemParameters.VirtualScreenTop;
+
+            // Secondary screen to the left (e.g. DISPLAY5 at X < 0)
+            if (vLeft < -50)
+            {
+                double leftWidth = Math.Abs(vLeft);
+                screens.Add(new Rect(vLeft, vTop, leftWidth, primaryWork.Height));
+            }
+
+            // Secondary screen to the right (if present)
+            double rightEdge = vLeft + vWidth;
+            if (rightEdge > primaryWork.Right + 50)
+            {
+                screens.Add(new Rect(primaryWork.Right, vTop, rightEdge - primaryWork.Right, primaryWork.Height));
+            }
+
+            return screens;
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -109,9 +153,12 @@ namespace DesktopPet
         {
             if (key == Key.C)
             {
-                // Toggle character
                 string nextChar = (_activeCharacter?.id == "hooded-blade") ? "robot" : "hooded-blade";
                 SwitchCharacter(nextChar);
+            }
+            else if (key == Key.M)
+            {
+                JumpToNextScreen();
             }
             else if (key == Key.Space || key == Key.S)
             {
@@ -180,7 +227,7 @@ namespace DesktopPet
         {
             if (animName == "run")
             {
-                StartNewRunTarget();
+                StartNewRunTarget(forceLongDistance: true);
             }
             PlayAnimation(animName);
         }
@@ -195,7 +242,6 @@ namespace DesktopPet
             if (MenuItemCharHoodedBlade != null) MenuItemCharHoodedBlade.IsChecked = isBlade;
             if (MenuItemCharRobot != null) MenuItemCharRobot.IsChecked = !isBlade;
 
-            // Update action menu headers
             if (MenuItemPower != null)
             {
                 MenuItemPower.Header = isBlade ? "⚡ Sword Power (Space / Click)" : "🥋 Kick Action (Space / Click)";
@@ -212,10 +258,10 @@ namespace DesktopPet
             Title = isBlade ? "Desktop Pet - Hooded Blade (Sword Master)" : "Desktop Pet - Robot Pet";
 
             RootGrid.ToolTip = isBlade
-                ? "Hooded Blade: Click for Sword Power! Double-click to switch to Robot. Press 'C' to switch."
-                : "Robot Pet: Click to Kick! Double-click to switch to Hooded Blade. Press 'C' to switch.";
+                ? "Hooded Blade: Click for Sword Power! Double-click to switch to Robot. Press 'M' to switch screens."
+                : "Robot Pet: Click to Kick! Double-click to switch to Hooded Blade. Press 'M' to switch screens.";
 
-            _idleFramesRemaining = _rng.Next(25, 60);
+            _idleFramesRemaining = _rng.Next(150, 300); // 6 to 12 seconds of peaceful idle
             PlayAnimation(_activeCharacter.defaultAnimation);
         }
 
@@ -225,7 +271,8 @@ namespace DesktopPet
             {
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "animation-config.json"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "animation-config.json"),
-                @"C:\Jay\Demos\dextop-pets\animation-config.json"
+                @"C:\Jay\Demos\dextop-pets\animation-config.json",
+                @"C:\Jay\CoreDemo\desktop-pets\animation-config.json"
             };
 
             string configPath = string.Empty;
@@ -251,7 +298,6 @@ namespace DesktopPet
 
             if (_config == null) return;
 
-            // Load multi-character structure
             if (_config.characters != null && _config.characters.Count > 0)
             {
                 foreach (var (charId, character) in _config.characters)
@@ -355,8 +401,9 @@ namespace DesktopPet
                 }
                 else
                 {
+                    // Action finished: rest peacefully for 6 to 14 seconds
                     string next = _currentAnimation.nextAnimation ?? "idle";
-                    _idleFramesRemaining = _rng.Next(25, 75);
+                    _idleFramesRemaining = _rng.Next(140, 320);
                     PlayAnimation(next);
                 }
             }
@@ -364,55 +411,62 @@ namespace DesktopPet
 
         private void HandleAutonomousBehavior()
         {
-            var workArea = SystemParameters.WorkArea;
-            double minX = 10;
-            double maxX = Math.Max(10, workArea.Width - Width - 10);
-            double minY = 10;
-            double maxY = Math.Max(10, workArea.Height - Height - 10);
-
             string current = _currentAnimation?.name ?? "idle";
             bool isBlade = (_activeCharacter?.id == "hooded-blade");
 
             if (current == "run")
             {
-                double dx = _targetX - Left;
-                double dy = _targetY - Top;
+                double dx = _targetX - _currentPosX;
+                double dy = _targetY - _currentPosY;
                 double dist = Math.Sqrt(dx * dx + dy * dy);
 
                 if (dist > 10 && _runFramesRemaining > 0)
                 {
                     _runFramesRemaining--;
 
-                    double stepX = Math.Sign(dx) * Math.Min(Math.Abs(dx), _moveSpeedX);
-                    double stepY = Math.Sign(dy) * Math.Min(Math.Abs(dy), _moveSpeedY);
+                    double speed = Math.Min(dist * 0.08 + 2.8, _moveSpeed);
+                    double stepX = (dx / dist) * speed;
+                    double stepY = (dy / dist) * speed;
 
-                    if (stepX < -0.5) SetFacing(true);
-                    else if (stepX > 0.5) SetFacing(false);
+                    if (stepX < -0.3) SetFacing(true);
+                    else if (stepX > 0.3) SetFacing(false);
 
-                    Left = Math.Clamp(Left + stepX, minX, maxX);
-                    Top = Math.Clamp(Top + stepY, minY, maxY);
+                    _currentPosX += stepX;
+                    _currentPosY += stepY;
+
+                    double vLeft = SystemParameters.VirtualScreenLeft;
+                    double vRight = SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - Width;
+                    double vTop = SystemParameters.VirtualScreenTop;
+                    double vBottom = SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - Height;
+
+                    _currentPosX = Math.Clamp(_currentPosX, vLeft, vRight);
+                    _currentPosY = Math.Clamp(_currentPosY, vTop, vBottom);
+
+                    Left = _currentPosX;
+                    Top = _currentPosY;
                 }
                 else
                 {
+                    // Arrived at destination: rest peacefully or do an occasional move
                     int roll = _rng.Next(100);
                     if (isBlade)
                     {
-                        if (roll < 45) PlayAnimation("sword-power");
-                        else if (roll < 75) PlayAnimation("attack");
-                        else if (roll < 90) PlayAnimation("jump");
+                        if (roll < 30) PlayAnimation("sword-power");
+                        else if (roll < 55) PlayAnimation("attack");
                         else
                         {
-                            _idleFramesRemaining = _rng.Next(35, 80);
+                            // Stay idle and rest for 7 to 16 seconds
+                            _idleFramesRemaining = _rng.Next(160, 380);
                             PlayAnimation("idle");
                         }
                     }
                     else
                     {
-                        if (roll < 45) PlayAnimation("kick");
-                        else if (roll < 80) PlayAnimation("punch");
+                        if (roll < 30) PlayAnimation("kick");
+                        else if (roll < 55) PlayAnimation("punch");
                         else
                         {
-                            _idleFramesRemaining = _rng.Next(35, 80);
+                            _idleFramesRemaining = _rng.Next(160, 380);
                             PlayAnimation("idle");
                         }
                     }
@@ -423,44 +477,128 @@ namespace DesktopPet
                 _idleFramesRemaining--;
                 if (_idleFramesRemaining <= 0)
                 {
-                    int roll = _rng.Next(100);
-                    if (roll < 50)
+                    if (_roamingPace == RoamingPace.Still)
                     {
-                        StartNewRunTarget();
+                        // In Still mode: never runs, only rests or does occasional stationary action
+                        int stillRoll = _rng.Next(100);
+                        if (stillRoll < 20)
+                        {
+                            SetFacing(_rng.Next(2) == 0);
+                            PlayAnimation(isBlade ? "sword-power" : "kick");
+                        }
+                        else
+                        {
+                            _idleFramesRemaining = _rng.Next(200, 450);
+                        }
+                        return;
+                    }
+
+                    int roll = _rng.Next(100);
+                    int runThreshold = (_roamingPace == RoamingPace.Active) ? 40 : 18; // Chill mode: 18% run chance
+
+                    if (roll < runThreshold)
+                    {
+                        StartNewRunTarget(forceLongDistance: false);
                         PlayAnimation("run");
+                    }
+                    else if (roll < runThreshold + 40)
+                    {
+                        // 40% chance: Continue resting peacefully in idle!
+                        _idleFramesRemaining = _rng.Next(140, 300); // Another 6-12 seconds of calm
                     }
                     else if (isBlade)
                     {
+                        // Occasional cool move in place
                         SetFacing(_rng.Next(2) == 0);
-                        if (roll < 75) PlayAnimation("sword-power");
-                        else if (roll < 90) PlayAnimation("attack");
+                        int moveRoll = _rng.Next(100);
+                        if (moveRoll < 55) PlayAnimation("sword-power");
+                        else if (moveRoll < 85) PlayAnimation("attack");
                         else PlayAnimation("jump");
                     }
                     else
                     {
                         SetFacing(_rng.Next(2) == 0);
-                        if (roll < 75) PlayAnimation("kick");
+                        if (_rng.Next(100) < 60) PlayAnimation("kick");
                         else PlayAnimation("punch");
                     }
                 }
             }
         }
 
-        private void StartNewRunTarget()
+        private void StartNewRunTarget(bool forceLongDistance = false)
         {
-            var workArea = SystemParameters.WorkArea;
-            double minX = 20;
-            double maxX = Math.Max(20, workArea.Width - Width - 20);
-            double minY = Math.Max(20, workArea.Height * 0.2);
-            double maxY = Math.Max(20, workArea.Height - Height - 20);
+            var screens = GetConnectedScreens();
+            var petCenter = new Point(Left + Width / 2, Top + Height / 2);
+            var currentScreen = screens.FirstOrDefault(s => s.Contains(petCenter));
+            if (currentScreen == default) currentScreen = screens[0];
 
-            _targetX = _rng.NextDouble() * (maxX - minX) + minX;
-            _targetY = _rng.NextDouble() * (maxY - minY) + minY;
+            Rect targetScreen;
 
-            _moveSpeedX = _rng.NextDouble() * 3.5 + 4.5;
-            _moveSpeedY = _rng.NextDouble() * 2.0 + 1.0;
+            // In Chill mode: 80% strolls nearby on current screen, 20% cross-monitor
+            bool crossMonitor = (screens.Count > 1) && (forceLongDistance || (_rng.Next(100) < (_roamingPace == RoamingPace.Active ? 50 : 20)));
 
-            _runFramesRemaining = _rng.Next(45, 120);
+            if (crossMonitor)
+            {
+                var otherScreens = screens.Where(s => s != currentScreen).ToList();
+                targetScreen = otherScreens[_rng.Next(otherScreens.Count)];
+
+                double minX = targetScreen.Left + 30;
+                double maxX = Math.Max(minX, targetScreen.Right - Width - 30);
+                double minY = targetScreen.Top + targetScreen.Height * 0.20;
+                double maxY = Math.Max(minY, targetScreen.Bottom - Height - 30);
+
+                _targetX = _rng.NextDouble() * (maxX - minX) + minX;
+                _targetY = _rng.NextDouble() * (maxY - minY) + minY;
+            }
+            else
+            {
+                // Local stroll on current screen (80 to 240 pixels away)
+                targetScreen = currentScreen;
+                double strollOffsetX = (_rng.NextDouble() * 200 + 70) * (_rng.Next(2) == 0 ? 1 : -1);
+                double strollOffsetY = (_rng.NextDouble() * 80 - 40);
+
+                double candX = Left + strollOffsetX;
+                double candY = Top + strollOffsetY;
+
+                double minX = targetScreen.Left + 25;
+                double maxX = Math.Max(minX, targetScreen.Right - Width - 25);
+                double minY = targetScreen.Top + targetScreen.Height * 0.15;
+                double maxY = Math.Max(minY, targetScreen.Bottom - Height - 25);
+
+                _targetX = Math.Clamp(candX, minX, maxX);
+                _targetY = Math.Clamp(candY, minY, maxY);
+            }
+
+            _currentPosX = Left;
+            _currentPosY = Top;
+
+            double dx = _targetX - _currentPosX;
+            double dy = _targetY - _currentPosY;
+            double dist = Math.Sqrt(dx * dx + dy * dy);
+
+            // Relaxed, natural running speed
+            _moveSpeed = (_roamingPace == RoamingPace.Active) ? (_rng.NextDouble() * 2.0 + 4.8) : (_rng.NextDouble() * 1.2 + 3.2);
+            _runFramesRemaining = Math.Max(40, (int)(dist / _moveSpeed) + 20);
+        }
+
+        public void JumpToNextScreen()
+        {
+            var screens = GetConnectedScreens();
+            if (screens.Count <= 1) return;
+
+            var petCenter = new Point(Left + Width / 2, Top + Height / 2);
+            var currentIdx = screens.FindIndex(s => s.Contains(petCenter));
+            if (currentIdx < 0) currentIdx = 0;
+
+            int nextIdx = (currentIdx + 1) % screens.Count;
+            var nextScreen = screens[nextIdx];
+
+            _currentPosX = nextScreen.Left + (nextScreen.Width - Width) / 2;
+            _currentPosY = nextScreen.Bottom - Height - 80;
+            Left = _currentPosX;
+            Top = _currentPosY;
+            _idleFramesRemaining = _rng.Next(150, 300);
+            PlayAnimation("idle");
         }
 
         private void SetFacing(bool faceLeft)
@@ -497,6 +635,8 @@ namespace DesktopPet
                 _dragStartPoint = e.GetPosition(this);
                 DragMove();
                 _userIsDragging = false;
+                _currentPosX = Left;
+                _currentPosY = Top;
             }
         }
 
@@ -504,7 +644,6 @@ namespace DesktopPet
         {
             if (e.ChangedButton == MouseButton.Left)
             {
-                // Double-click instantly toggles character!
                 string nextChar = (_activeCharacter?.id == "hooded-blade") ? "robot" : "hooded-blade";
                 SwitchCharacter(nextChar);
             }
@@ -513,6 +652,8 @@ namespace DesktopPet
         private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             _userIsDragging = false;
+            _currentPosX = Left;
+            _currentPosY = Top;
             var endPoint = e.GetPosition(this);
             double dist = (endPoint - _dragStartPoint).Length;
 
@@ -540,6 +681,26 @@ namespace DesktopPet
                 PlayAnimation("idle");
             }
         }
+
+        private void MenuPaceCalm_Click(object sender, RoutedEventArgs e) => SetPace(RoamingPace.Chill);
+        private void MenuPaceActive_Click(object sender, RoutedEventArgs e) => SetPace(RoamingPace.Active);
+        private void MenuPaceStill_Click(object sender, RoutedEventArgs e) => SetPace(RoamingPace.Still);
+
+        private void SetPace(RoamingPace pace)
+        {
+            _roamingPace = pace;
+            MenuItemPaceCalm.IsChecked = (pace == RoamingPace.Chill);
+            MenuItemPaceActive.IsChecked = (pace == RoamingPace.Active);
+            MenuItemPaceStill.IsChecked = (pace == RoamingPace.Still);
+
+            if (pace == RoamingPace.Still && _currentAnimation?.name == "run")
+            {
+                PlayAnimation("idle");
+            }
+            _idleFramesRemaining = (pace == RoamingPace.Chill) ? 200 : 80;
+        }
+
+        private void MenuNextScreen_Click(object sender, RoutedEventArgs e) => JumpToNextScreen();
 
         private void MenuFps12_Click(object sender, RoutedEventArgs e) => SetFpsPreset(12);
         private void MenuFps24_Click(object sender, RoutedEventArgs e) => SetFpsPreset(24);
@@ -576,9 +737,14 @@ namespace DesktopPet
 
         private void MenuResetPos_Click(object sender, RoutedEventArgs e)
         {
-            var workArea = SystemParameters.WorkArea;
-            Left = (workArea.Width - Width) / 2;
-            Top = (workArea.Height - Height) / 2;
+            var screens = GetConnectedScreens();
+            var primary = screens[0];
+
+            _currentPosX = primary.Left + (primary.Width - Width) / 2;
+            _currentPosY = primary.Top + (primary.Height - Height) / 2;
+            Left = _currentPosX;
+            Top = _currentPosY;
+            _idleFramesRemaining = _rng.Next(150, 300);
             PlayAnimation("idle");
         }
 

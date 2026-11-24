@@ -26,6 +26,11 @@
             <MenuItem Header="🧍 Idle Stance (I)" Click="MenuIdle_Click" />
             <Separator />
             <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
+            <MenuItem Header="Roaming Activity">
+                <MenuItem Header="🌱 Chill &amp; Relaxed (Calm, rare running)" Click="MenuPaceCalm_Click" IsChecked="True" x:Name="MenuItemPaceCalm" />
+                <MenuItem Header="⚡ Active (More frequent movement)" Click="MenuPaceActive_Click" x:Name="MenuItemPaceActive" />
+                <MenuItem Header="🛑 Sit Still (No running)" Click="MenuPaceStill_Click" x:Name="MenuItemPaceStill" />
+            </MenuItem>
             <Separator />
             <MenuItem Header="Frame Rate">
                 <MenuItem Header="12 FPS (Half Speed)" Click="MenuFps12_Click" />
@@ -40,12 +45,13 @@
             </MenuItem>
             <MenuItem Header="Always on Top" IsCheckable="True" IsChecked="True" Click="MenuTopmost_Click" x:Name="MenuItemTopmost" />
             <Separator />
+            <MenuItem Header="📺 Send to Next Display (M)" Click="MenuNextScreen_Click" FontWeight="SemiBold" />
             <MenuItem Header="Reset to Screen Center" Click="MenuResetPos_Click" />
             <MenuItem Header="Exit Desktop Pet" Click="MenuExit_Click" />
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Grid Background="Transparent" x:Name="RootGrid" ToolTip="Desktop Pet: Click for Sword Power! Double-click to switch character. Right-click for options.">
+    <Grid Background="Transparent" x:Name="RootGrid" ToolTip="Desktop Pet: Double-click to switch character. Press 'M' to switch screens. Right-click for options.">
         <Image x:Name="PetImage"
                Stretch="Uniform"
                HorizontalAlignment="Center"
