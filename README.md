@@ -74,10 +74,12 @@ dotnet run --no-restore
 ```
 
 **Controls**:
+- **Double-Click**: **Toggle Character** between Hooded Blade and Robot!
 - **Left-Click**: Unleashes **Sword Power** (or Kick for Robot).
-- **Click & Drag**: Move pet anywhere across monitors.
+- **Click & Drag**: Move pet anywhere across all monitors.
 - **Hotkeys**:
-  - `C`: **Toggle Character** between Hooded Blade and Robot!
+  - `C`: **Toggle Character** (Hooded Blade ↔ Robot Pet)
+  - `M`: **Send to Next Display** (Teleport between Laptop and Extended Screen)
   - `Space` or `S`: **Sword Power** (or Kick)
   - `A`: **Sword Attack** (or Punch)
   - `J`: **Leap Jump**
@@ -85,11 +87,18 @@ dotnet run --no-restore
   - `I`: **Idle Stance**
   - `Esc`: Exit
 - **Right-Click Menu**:
+  - **👁️ Eye Health Care (20-20-20 Rule)**:
+    - ✅ Reminder Active (Every 20 Mins)
+    - 🔔 Remind Now (Test Alert Bubble)
+    - ⏱️ Every 20 / 30 / 45 Minutes
   - Switch Character (Hooded Blade / Robot)
   - Action Triggers (Sword Power, Sword Slash, Leap Jump, Run, Idle)
-  - Autonomous Roaming toggle
+  - Autonomous Roaming & Pacing (Chill & Relaxed, Active, Sit Still)
+  - Frame Rate (12, 24, 30, 48 FPS)
   - Pet Scale (Small, Medium, Original)
   - Always on Top toggle
+  - 📺 Send to Next Display (M)
+  - Reset to Screen Center
 
 ---
 

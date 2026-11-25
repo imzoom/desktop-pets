@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Media;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -79,6 +82,14 @@ namespace DesktopPet
         private double _moveSpeed = 3.6;
         private bool _facingLeft = false;
 
+        // 👁️ 20-20-20 Eye Health Care Timer & State
+        private readonly DispatcherTimer _eyeHealthTimer = new();
+        private int _eyeHealthIntervalMinutes = 20; // Default: 20 minutes (20-20-20 rule)
+        private int _eyeHealthSecondsRemaining = 20 * 60;
+        private bool _eyeHealthEnabled = true;
+        private bool _isEyeBreakActive = false;
+        private int _eyeBreakSecondsLeft = 20;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -92,14 +103,15 @@ namespace DesktopPet
             try
             {
                 // Guarantee pet starts clearly visible in bottom-right corner of user's primary screen
-                Left = SystemParameters.WorkArea.Right - Width - 80;
-                Top = SystemParameters.WorkArea.Bottom - Height - 80;
+                Left = SystemParameters.WorkArea.Right - Width - 60;
+                Top = SystemParameters.WorkArea.Bottom - Height - 40;
 
                 _currentPosX = Left;
                 _currentPosY = Top;
 
                 LoadAnimationConfig();
                 SetupTimer();
+                SetupEyeHealthTimer();
 
                 string startChar = _characters.ContainsKey("hooded-blade") ? "hooded-blade" : (_characters.Keys.FirstOrDefault() ?? "robot");
                 SwitchCharacter(startChar);
@@ -143,6 +155,143 @@ namespace DesktopPet
 
             return screens;
         }
+
+        #region Eye Health 20-20-20 System
+
+        private void SetupEyeHealthTimer()
+        {
+            _eyeHealthSecondsRemaining = _eyeHealthIntervalMinutes * 60;
+            _eyeHealthTimer.Interval = TimeSpan.FromSeconds(1);
+            _eyeHealthTimer.Tick += EyeHealthTimer_Tick;
+            _eyeHealthTimer.Start();
+        }
+
+        private void EyeHealthTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!_eyeHealthEnabled) return;
+
+            if (_isEyeBreakActive)
+            {
+                _eyeBreakSecondsLeft--;
+                if (_eyeBreakSecondsLeft > 0)
+                {
+                    EyeHealthProgress.Value = _eyeBreakSecondsLeft;
+                    EyeHealthCountdown.Text = $"Looking 20ft away... {_eyeBreakSecondsLeft}s";
+                }
+                else
+                {
+                    EyeHealthProgress.Value = 0;
+                    EyeHealthCountdown.Text = "Eyes refreshed! Keep up the good work ✨";
+                    DismissEyeHealthAlert(delayedFade: true);
+                }
+                return;
+            }
+
+            _eyeHealthSecondsRemaining--;
+            if (_eyeHealthSecondsRemaining <= 0)
+            {
+                ShowEyeHealthAlert();
+            }
+        }
+
+        public void ShowEyeHealthAlert()
+        {
+            _isEyeBreakActive = true;
+            _eyeBreakSecondsLeft = 20;
+
+            bool isBlade = (_activeCharacter?.id == "hooded-blade");
+
+            // Character-specific personality dialogues for eye health
+            if (isBlade)
+            {
+                EyeHealthBubble.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+                EyeHealthHeader.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+                EyeHealthHeader.Text = "🥷 Blade Master: Eye Care Stance";
+                EyeHealthMessage.Text = "20 minutes of focus have passed! Rest your warrior vision — gaze at an object 20 feet into the horizon for 20 seconds to keep your sight razor sharp! 🍃";
+                EyeHealthProgress.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+            }
+            else
+            {
+                EyeHealthBubble.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8"));
+                EyeHealthHeader.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8"));
+                EyeHealthHeader.Text = "🤖 Robot: Optical Health Protocol";
+                EyeHealthMessage.Text = "20 minutes of screen time detected! Optical sensors recommend resting your human eyes: look 20 feet away for 20 seconds. 🔭";
+                EyeHealthProgress.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8"));
+            }
+
+            EyeHealthProgress.Maximum = 20;
+            EyeHealthProgress.Value = 20;
+            EyeHealthCountdown.Text = "Looking 20ft away... 20s";
+
+            // Make bubble visible and smoothly fade in
+            EyeHealthBubble.Visibility = Visibility.Visible;
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(350));
+            EyeHealthBubble.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+            // Play gentle system chime
+            try
+            {
+                SystemSounds.Asterisk.Play();
+            }
+            catch { }
+
+            // Bring pet to calm idle stance during break
+            PlayAnimation("idle");
+        }
+
+        public void DismissEyeHealthAlert(bool delayedFade = false)
+        {
+            _isEyeBreakActive = false;
+            _eyeHealthSecondsRemaining = _eyeHealthIntervalMinutes * 60; // Reset next interval countdown
+
+            var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(delayedFade ? 1200 : 300));
+            if (delayedFade)
+            {
+                fadeOut.BeginTime = TimeSpan.FromSeconds(1.5);
+            }
+            fadeOut.Completed += (s, e) =>
+            {
+                if (!_isEyeBreakActive)
+                {
+                    EyeHealthBubble.Visibility = Visibility.Collapsed;
+                }
+            };
+            EyeHealthBubble.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        }
+
+        private void EyeHealthBubble_Click(object sender, MouseButtonEventArgs e)
+        {
+            DismissEyeHealthAlert(delayedFade: false);
+        }
+
+        private void MenuEyeHealthToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _eyeHealthEnabled = MenuItemEyeHealthEnabled.IsChecked;
+            if (!_eyeHealthEnabled && _isEyeBreakActive)
+            {
+                DismissEyeHealthAlert(delayedFade: false);
+            }
+        }
+
+        private void MenuEyeHealthTest_Click(object sender, RoutedEventArgs e)
+        {
+            ShowEyeHealthAlert();
+        }
+
+        private void MenuEyeInterval20_Click(object sender, RoutedEventArgs e) => SetEyeInterval(20, MenuItemEyeInterval20);
+        private void MenuEyeInterval30_Click(object sender, RoutedEventArgs e) => SetEyeInterval(30, MenuItemEyeInterval30);
+        private void MenuEyeInterval45_Click(object sender, RoutedEventArgs e) => SetEyeInterval(45, MenuItemEyeInterval45);
+
+        private void SetEyeInterval(int minutes, System.Windows.Controls.MenuItem selectedItem)
+        {
+            _eyeHealthIntervalMinutes = minutes;
+            _eyeHealthSecondsRemaining = minutes * 60;
+            MenuItemEyeInterval20.IsChecked = (selectedItem == MenuItemEyeInterval20);
+            MenuItemEyeInterval30.IsChecked = (selectedItem == MenuItemEyeInterval30);
+            MenuItemEyeInterval45.IsChecked = (selectedItem == MenuItemEyeInterval45);
+        }
+
+        #endregion
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -255,11 +404,11 @@ namespace DesktopPet
                 MenuItemJump.Visibility = isBlade ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            Title = isBlade ? "Desktop Pet - Hooded Blade (Sword Master)" : "Desktop Pet - Robot Pet";
+            Title = isBlade ? "Desktop Pet - Hooded Blade (Sword Master & Eye Care)" : "Desktop Pet - Robot Pet & Eye Care";
 
             RootGrid.ToolTip = isBlade
-                ? "Hooded Blade: Click for Sword Power! Double-click to switch to Robot. Press 'M' to switch screens."
-                : "Robot Pet: Click to Kick! Double-click to switch to Hooded Blade. Press 'M' to switch screens.";
+                ? "Hooded Blade: Click for Sword Power! Double-click to switch to Robot. Press 'M' to switch screens. 20-20-20 Eye health enabled."
+                : "Robot Pet: Click to Kick! Double-click to switch to Hooded Blade. Press 'M' to switch screens. 20-20-20 Eye health enabled.";
 
             _idleFramesRemaining = _rng.Next(150, 300); // 6 to 12 seconds of peaceful idle
             PlayAnimation(_activeCharacter.defaultAnimation);
@@ -376,7 +525,8 @@ namespace DesktopPet
         {
             if (_currentAnimation == null || _currentAnimation.CachedBitmaps.Count == 0) return;
 
-            if (_isAutonomous && !_userIsDragging)
+            // Pause autonomous roaming during active eye breaks so pet stays calmly resting
+            if (_isAutonomous && !_userIsDragging && !_isEyeBreakActive)
             {
                 HandleAutonomousBehavior();
             }
@@ -594,7 +744,7 @@ namespace DesktopPet
             var nextScreen = screens[nextIdx];
 
             _currentPosX = nextScreen.Left + (nextScreen.Width - Width) / 2;
-            _currentPosY = nextScreen.Bottom - Height - 80;
+            _currentPosY = nextScreen.Bottom - Height - 60;
             Left = _currentPosX;
             Top = _currentPosY;
             _idleFramesRemaining = _rng.Next(150, 300);
@@ -721,10 +871,13 @@ namespace DesktopPet
         private void MenuScaleMedium_Click(object sender, RoutedEventArgs e) => SetScale(384, 384, MenuItemScaleMedium);
         private void MenuScaleOriginal_Click(object sender, RoutedEventArgs e) => SetScale(512, 512, MenuItemScaleOriginal);
 
-        private void SetScale(double width, double height, System.Windows.Controls.MenuItem selectedItem)
+        private void SetScale(double petW, double petH, System.Windows.Controls.MenuItem selectedItem)
         {
-            Width = width;
-            Height = height;
+            PetImage.Width = petW;
+            PetImage.Height = petH;
+            Width = petW + 64;
+            Height = petH + 104;
+
             MenuItemScaleSmall.IsChecked = (selectedItem == MenuItemScaleSmall);
             MenuItemScaleMedium.IsChecked = (selectedItem == MenuItemScaleMedium);
             MenuItemScaleOriginal.IsChecked = (selectedItem == MenuItemScaleOriginal);

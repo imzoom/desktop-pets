@@ -77,20 +77,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isDragging = false;
   let dragStart = { x: 0, y: 0 };
 
-  // Autonomous Roaming State
+  // Autonomous Roaming State - Relaxed & Calm Pacing
   let isAutonomous = true;
-  let idleCountdown = Math.floor(Math.random() * 30 + 25);
+  let idleCountdown = Math.floor(Math.random() * 150 + 150); // 6 to 12 seconds of calm idle
   let runCountdown = 0;
   let targetPos = { x: 0, y: 0 };
-  let moveSpeed = { x: 4.5, y: 1.5 };
+  let moveSpeed = { x: 3.5, y: 1.2 };
   let facingLeft = false;
 
   function pickNewRunDestination() {
-    targetPos.x = (Math.random() - 0.5) * 360;
-    targetPos.y = (Math.random() - 0.5) * 120;
-    moveSpeed.x = Math.random() * 3 + 4;
-    moveSpeed.y = Math.random() * 1.5 + 1;
-    runCountdown = Math.floor(Math.random() * 60 + 50);
+    targetPos.x = (Math.random() - 0.5) * 260;
+    targetPos.y = (Math.random() - 0.5) * 80;
+    moveSpeed.x = Math.random() * 1.5 + 3.0; // 3.0 to 4.5 px per frame
+    moveSpeed.y = Math.random() * 1.0 + 0.8;
+    runCountdown = Math.floor(Math.random() * 40 + 35);
   }
 
   function handleAutonomousLogic() {
@@ -117,18 +117,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         const roll = Math.random() * 100;
         if (isBlade) {
-          if (roll < 45) controller.play('sword-power'); // Unleash Sword Power!
-          else if (roll < 75) controller.play('attack');  // Sword Slash
-          else if (roll < 90) controller.play('jump');    // Leap Jump
+          if (roll < 35) controller.play('sword-power');
+          else if (roll < 60) controller.play('attack');
           else {
-            idleCountdown = Math.floor(Math.random() * 45 + 25);
+            idleCountdown = Math.floor(Math.random() * 180 + 160); // 7 to 14 seconds of rest
             controller.play('idle');
           }
         } else {
-          if (roll < 45) controller.play('kick');
-          else if (roll < 80) controller.play('punch');
+          if (roll < 35) controller.play('kick');
+          else if (roll < 60) controller.play('punch');
           else {
-            idleCountdown = Math.floor(Math.random() * 45 + 25);
+            idleCountdown = Math.floor(Math.random() * 180 + 160);
             controller.play('idle');
           }
         }
@@ -137,17 +136,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       idleCountdown--;
       if (idleCountdown <= 0) {
         const roll = Math.random() * 100;
-        if (roll < 50) {
+        if (roll < 18) { // Only 18% run chance
           pickNewRunDestination();
           controller.play('run');
+        } else if (roll < 58) {
+          // 40% chance: continue resting in idle
+          idleCountdown = Math.floor(Math.random() * 160 + 140);
         } else if (isBlade) {
           facingLeft = Math.random() < 0.5;
-          if (roll < 75) controller.play('sword-power'); // 25% Sword Power!
-          else if (roll < 90) controller.play('attack');
+          if (roll < 80) controller.play('sword-power');
+          else if (roll < 92) controller.play('attack');
           else controller.play('jump');
         } else {
           facingLeft = Math.random() < 0.5;
-          if (roll < 75) controller.play('kick');
+          if (roll < 80) controller.play('kick');
           else controller.play('punch');
         }
       }
@@ -389,6 +391,96 @@ document.addEventListener('DOMContentLoaded', async () => {
       controller.play('idle');
     }
   });
+
+  // Eye Health Elements
+  const eyeHealthBubble = document.getElementById('eyeHealthBubble');
+  const eyeHealthTitle = document.getElementById('eyeHealthTitle');
+  const eyeHealthText = document.getElementById('eyeHealthText');
+  const eyeHealthBar = document.getElementById('eyeHealthBar');
+  const eyeHealthCountdown = document.getElementById('eyeHealthCountdown');
+  const btnCloseEyeBubble = document.getElementById('btnCloseEyeBubble');
+  const btnTestEyeBreak = document.getElementById('btnTestEyeBreak');
+  const chkEyeHealth = document.getElementById('chkEyeHealth');
+  const lblNextEyeBreak = document.getElementById('lblNextEyeBreak');
+
+  // Eye Health State (20-20-20 Rule)
+  let eyeHealthEnabled = true;
+  let eyeBreakSecondsRemaining = 20 * 60; // 20 minutes
+  let isEyeBreakActive = false;
+  let eyeBreakSecondsLeft = 20;
+
+  function triggerEyeBreak() {
+    isEyeBreakActive = true;
+    eyeBreakSecondsLeft = 20;
+    const isBlade = (activeCharacterId === 'hooded-blade');
+
+    if (isBlade) {
+      eyeHealthBubble.style.borderColor = '#10b981';
+      eyeHealthTitle.style.color = '#10b981';
+      eyeHealthTitle.textContent = '🥷 Blade Master: Eye Care Stance';
+      eyeHealthText.textContent = '20 minutes of focus have passed! Rest your warrior vision — gaze at an object 20 feet into the horizon for 20 seconds to keep your sight razor sharp! 🍃';
+      eyeHealthBar.style.background = '#10b981';
+    } else {
+      eyeHealthBubble.style.borderColor = '#38bdf8';
+      eyeHealthTitle.style.color = '#38bdf8';
+      eyeHealthTitle.textContent = '🤖 Robot: Optical Health Protocol';
+      eyeHealthText.textContent = '20 minutes of screen time detected! Optical sensors recommend resting your human eyes: look 20 feet away for 20 seconds. 🔭';
+      eyeHealthBar.style.background = '#38bdf8';
+    }
+
+    eyeHealthBar.style.width = '100%';
+    eyeHealthCountdown.textContent = 'Looking 20ft away... 20s remaining';
+    eyeHealthBubble.classList.remove('hidden');
+    controller.play('idle');
+  }
+
+  function dismissEyeBreak() {
+    isEyeBreakActive = false;
+    eyeBreakSecondsRemaining = 20 * 60;
+    eyeHealthBubble.classList.add('hidden');
+  }
+
+  if (btnCloseEyeBubble) {
+    btnCloseEyeBubble.addEventListener('click', dismissEyeBreak);
+  }
+  if (btnTestEyeBreak) {
+    btnTestEyeBreak.addEventListener('click', triggerEyeBreak);
+  }
+  if (chkEyeHealth) {
+    chkEyeHealth.addEventListener('change', e => {
+      eyeHealthEnabled = e.target.checked;
+      if (!eyeHealthEnabled && isEyeBreakActive) dismissEyeBreak();
+    });
+  }
+
+  // 1-second interval for 20-20-20 eye health timer
+  setInterval(() => {
+    if (!eyeHealthEnabled) return;
+
+    if (isEyeBreakActive) {
+      eyeBreakSecondsLeft--;
+      if (eyeBreakSecondsLeft > 0) {
+        eyeHealthBar.style.width = `${(eyeBreakSecondsLeft / 20) * 100}%`;
+        eyeHealthCountdown.textContent = `Looking 20ft away... ${eyeBreakSecondsLeft}s remaining`;
+      } else {
+        eyeHealthBar.style.width = '0%';
+        eyeHealthCountdown.textContent = 'Eyes refreshed! Keep up the good work ✨';
+        setTimeout(dismissEyeBreak, 2000);
+      }
+      return;
+    }
+
+    eyeBreakSecondsRemaining--;
+    if (eyeBreakSecondsRemaining <= 0) {
+      triggerEyeBreak();
+    }
+
+    if (lblNextEyeBreak) {
+      const mins = Math.floor(eyeBreakSecondsRemaining / 60);
+      const secs = eyeBreakSecondsRemaining % 60;
+      lblNextEyeBreak.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+  }, 1000);
 
   // Initialize UI
   switchActiveCharacter(activeCharacterId);

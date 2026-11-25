@@ -50,6 +50,21 @@
       </div>
 
       <div class="stage-wrapper bg-dark" id="stageWrapper">
+        <!-- 👁️ 20-20-20 Eye Health Speech Bubble Overlay -->
+        <div id="eyeHealthBubble" class="eye-health-bubble hidden">
+          <div class="eye-health-header">
+            <span id="eyeHealthTitle">🥷 Blade Master: Eye Care Stance</span>
+            <button id="btnCloseEyeBubble" class="eye-health-close" title="Dismiss break">&times;</button>
+          </div>
+          <div id="eyeHealthText" class="eye-health-body">
+            20 minutes passed! Rest your eyes from the screen — look 20 feet away into the horizon for 20 seconds to keep your sight razor sharp! 🍃
+          </div>
+          <div class="eye-health-bar-container">
+            <div id="eyeHealthBar" class="eye-health-bar"></div>
+          </div>
+          <div id="eyeHealthCountdown" class="eye-health-countdown">Looking 20ft away... 20s</div>
+        </div>
+
         <canvas id="petCanvas" width="512" height="512"></canvas>
         <div class="stage-hint">💡 Click character for Sword Power! Drag to move. 'C' to toggle character.</div>
       </div>
@@ -112,6 +127,24 @@
             <input type="checkbox" id="chkDebug">
             <span>Show Anchor &amp; Boundary Inspection</span>
           </label>
+        </div>
+      </div>
+
+      <!-- 👁️ 20-20-20 Eye Health Care Card -->
+      <div class="card" style="border-left: 3px solid #10b981;">
+        <div class="card-title">
+          <span>👁️ 20-20-20 Eye Care</span>
+          <button id="btnTestEyeBreak" style="padding: 2px 8px; font-size: 0.75rem; background: #065f46; color: #a7f3d0; border: 1px solid #10b981; border-radius: 4px; cursor: pointer;">Test Alert</button>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="font-weight: 600; color: #34d399;">
+            <input type="checkbox" id="chkEyeHealth" checked>
+            <span>Remind every 20 mins for eye rest</span>
+          </label>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+          <span>Next 20s Break In:</span>
+          <strong id="lblNextEyeBreak" style="color: #6ee7b7; font-family: monospace; font-size: 0.85rem;">20:00</strong>
         </div>
       </div>
 
