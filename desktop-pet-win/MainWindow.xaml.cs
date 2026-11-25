@@ -420,29 +420,44 @@ namespace DesktopPet
             {
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "animation-config.json"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "animation-config.json"),
-                @"C:\Jay\Demos\dextop-pets\animation-config.json",
-                @"C:\Jay\CoreDemo\desktop-pets\animation-config.json"
+                Path.Combine(Directory.GetCurrentDirectory(), "animation-config.json"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "animation-config.json")
             };
 
             string configPath = string.Empty;
+            string json = string.Empty;
+
             foreach (var path in candidatePaths)
             {
                 var full = Path.GetFullPath(path);
                 if (File.Exists(full))
                 {
                     configPath = full;
+                    _baseDirectory = Path.GetDirectoryName(configPath)!;
+                    json = File.ReadAllText(configPath);
                     break;
                 }
             }
 
-            if (string.IsNullOrEmpty(configPath))
+            // Fallback to embedded assembly resource if not found on disk (e.g. running standalone single .exe)
+            if (string.IsNullOrEmpty(json))
+            {
+                var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                using var stream = asm.GetManifestResourceStream("animation-config.json")
+                                ?? asm.GetManifestResourceStream("DesktopPet.animation-config.json");
+                if (stream != null)
+                {
+                    using var reader = new StreamReader(stream);
+                    json = reader.ReadToEnd();
+                }
+            }
+
+            if (string.IsNullOrEmpty(json))
             {
                 MessageBox.Show("Could not find animation-config.json.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            _baseDirectory = Path.GetDirectoryName(configPath)!;
-            string json = File.ReadAllText(configPath);
             _config = JsonSerializer.Deserialize<AppConfig>(json);
 
             if (_config == null) return;
@@ -471,24 +486,63 @@ namespace DesktopPet
 
         private void CacheCharacterBitmaps(CharacterData character)
         {
+            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+
             foreach (var (_, anim) in character.animations)
             {
-                string framesDir = Path.Combine(_baseDirectory, anim.framesDir);
-                if (Directory.Exists(framesDir))
+                string framesDir = string.IsNullOrEmpty(_baseDirectory) ? "" : Path.Combine(_baseDirectory, anim.framesDir);
+                bool loadedFromDisk = false;
+
+                if (!string.IsNullOrEmpty(framesDir) && Directory.Exists(framesDir))
                 {
                     var files = Directory.GetFiles(framesDir, "frame_*.png").OrderBy(f => f).ToList();
-                    anim.CachedBitmaps = new List<BitmapImage>(files.Count);
-
-                    foreach (var file in files)
+                    if (files.Count > 0)
                     {
-                        var bitmap = new BitmapImage();
-                        bitmap.BeginInit();
-                        bitmap.UriSource = new Uri(file, UriKind.Absolute);
-                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
-                        bitmap.EndInit();
-                        bitmap.Freeze();
-                        anim.CachedBitmaps.Add(bitmap);
+                        anim.CachedBitmaps = new List<BitmapImage>(files.Count);
+
+                        foreach (var file in files)
+                        {
+                            var bitmap = new BitmapImage();
+                            bitmap.BeginInit();
+                            bitmap.UriSource = new Uri(file, UriKind.Absolute);
+                            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                            bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+                            bitmap.EndInit();
+                            bitmap.Freeze();
+                            anim.CachedBitmaps.Add(bitmap);
+                        }
+                        loadedFromDisk = true;
+                    }
+                }
+
+                // Fallback to embedded assembly resources if not found on disk
+                if (!loadedFromDisk)
+                {
+                    anim.CachedBitmaps = new List<BitmapImage>();
+                    string normalizedDir = anim.framesDir.Replace('\\', '/').Trim('/');
+
+                    for (int i = 0; i < anim.totalFrames; i++)
+                    {
+                        string frameFileName = $"frame_{i:D3}.png";
+                        string resPath = $"{normalizedDir}/{frameFileName}";
+
+                        var stream = asm.GetManifestResourceStream(resPath)
+                                  ?? asm.GetManifestResourceStream($"DesktopPet.{resPath}");
+
+                        if (stream != null)
+                        {
+                            using (stream)
+                            {
+                                var bitmap = new BitmapImage();
+                                bitmap.BeginInit();
+                                bitmap.StreamSource = stream;
+                                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                                bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+                                bitmap.EndInit();
+                                bitmap.Freeze();
+                                anim.CachedBitmaps.Add(bitmap);
+                            }
+                        }
                     }
                 }
             }
