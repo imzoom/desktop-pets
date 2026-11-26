@@ -1,0 +1,19 @@
+# Build and Output Folders
+bin/
+obj/
+release/
+publish-test/
+temp-standalone-test/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs & Diagnostics
+*.log
+run_log.txt
+debug_pos.txt

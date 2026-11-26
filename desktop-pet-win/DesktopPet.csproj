@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,6 +6,25 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+
+    <!-- Standalone Self-Contained Zero-Dependency Configuration -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <!-- Embed resources so DesktopPet.exe can run 100% standalone anywhere with ZERO external files -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\animation-config.json" LogicalName="animation-config.json" />
+    <EmbeddedResource Include="..\extracted_frames\**\*.png" LogicalName="extracted_frames/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Also copy to output folder for folder-based execution and easy customization -->
+  <ItemGroup>
+    <None Include="..\animation-config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\extracted_frames\**\*" CopyToOutputDirectory="PreserveNewest" Link="extracted_frames\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 
 </Project>

@@ -1,10 +1,11 @@
-// Web Desktop Pet Client
+// Web Desktop Pet Client - Multi-Character & Sword Power Studio
 document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('petCanvas');
   const ctx = canvas.getContext('2d');
   const stageWrapper = document.getElementById('stageWrapper');
 
   // UI Elements
+  const charSelect = document.getElementById('charSelect');
   const currentAnimBadge = document.getElementById('currentAnimBadge');
   const lblFrame = document.getElementById('lblFrame');
   const lblTime = document.getElementById('lblTime');
@@ -22,43 +23,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnApplySeq = document.getElementById('btnApplySeq');
   const btnResetSeq = document.getElementById('btnResetSeq');
   const bgSelect = document.getElementById('bgSelect');
-
-  // Action buttons
-  const actionButtons = {
-    idle: document.getElementById('btnActIdle'),
-    kick: document.getElementById('btnActKick'),
-    punch: document.getElementById('btnActPunch'),
-    run: document.getElementById('btnActRun')
-  };
+  const actionButtonsContainer = document.getElementById('actionButtonsContainer');
+  const actionHint = document.getElementById('actionHint');
 
   // Inspector Elements
+  const metaChar = document.getElementById('metaChar');
   const metaAnim = document.getElementById('metaAnim');
   const metaFile = document.getElementById('metaFile');
   const metaBaseline = document.getElementById('metaBaseline');
-  const metaAnchor = document.getElementById('metaAnchor');
-  const metaBox = document.getElementById('metaBox');
 
-  // Load animation configuration
+  // Load configuration
   const response = await fetch('../animation-config.json');
   const config = await response.json();
 
-  // Preload images into memory for instant rendering
+  let activeCharacterId = config.defaultCharacter || 'hooded-blade';
+  let activeCharDef = config.characters ? config.characters[activeCharacterId] : config;
+
+  // Preload frames for all characters
   const imageCache = new Map();
   async function preloadAllFrames() {
     const promises = [];
-    for (const [key, anim] of Object.entries(config.animations)) {
-      for (const frame of anim.frames) {
-        const img = new Image();
-        const src = `../${anim.framesDir}/${frame.file}`;
-        img.src = src;
-        const p = new Promise(resolve => {
-          img.onload = () => {
-            imageCache.set(`${key}:${frame.index}`, img);
-            resolve();
-          };
-          img.onerror = () => resolve();
-        });
-        promises.push(p);
+    const characters = config.characters || { [activeCharacterId]: config };
+
+    for (const [charId, character] of Object.entries(characters)) {
+      for (const [animKey, anim] of Object.entries(character.animations)) {
+        for (const frame of anim.frames) {
+          const img = new Image();
+          const src = `../${anim.framesDir}/${frame.file}`;
+          img.src = src;
+          const p = new Promise(resolve => {
+            img.onload = () => {
+              imageCache.set(`${charId}:${animKey}:${frame.index}`, img);
+              resolve();
+            };
+            img.onerror = () => resolve();
+          });
+          promises.push(p);
+        }
       }
     }
     await Promise.all(promises);
@@ -66,8 +67,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await preloadAllFrames();
 
-  // Create reusable controller
-  const controller = new SpriteAnimationController(config);
+  // Create controller
+  let controller = new SpriteAnimationController(activeCharDef);
 
   let currentScale = 0.5;
   canvas.style.transform = 'scale(0.5)';
@@ -76,27 +77,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isDragging = false;
   let dragStart = { x: 0, y: 0 };
 
-  // Autonomous Roaming & Random Actions State
+  // Autonomous Roaming State - Relaxed & Calm Pacing
   let isAutonomous = true;
-  let idleCountdown = Math.floor(Math.random() * 40 + 30);
+  let idleCountdown = Math.floor(Math.random() * 150 + 150); // 6 to 12 seconds of calm idle
   let runCountdown = 0;
   let targetPos = { x: 0, y: 0 };
-  let moveSpeed = { x: 4.5, y: 1.5 };
+  let moveSpeed = { x: 3.5, y: 1.2 };
   let facingLeft = false;
 
   function pickNewRunDestination() {
-    // Wander within the stage bounds (-180 to +180 px horizontal, -60 to +60 px vertical)
-    targetPos.x = (Math.random() - 0.5) * 360;
-    targetPos.y = (Math.random() - 0.5) * 120;
-    moveSpeed.x = Math.random() * 3 + 4; // 4 to 7 px per frame
-    moveSpeed.y = Math.random() * 1.5 + 1; // 1 to 2.5 px per frame
-    runCountdown = Math.floor(Math.random() * 60 + 50); // 2 to 4.5 seconds of run
+    targetPos.x = (Math.random() - 0.5) * 260;
+    targetPos.y = (Math.random() - 0.5) * 80;
+    moveSpeed.x = Math.random() * 1.5 + 3.0; // 3.0 to 4.5 px per frame
+    moveSpeed.y = Math.random() * 1.0 + 0.8;
+    runCountdown = Math.floor(Math.random() * 40 + 35);
   }
 
   function handleAutonomousLogic() {
     if (!isAutonomous || isDragging) return;
 
     const animName = controller.currentAnimation?.name || 'idle';
+    const isBlade = (activeCharacterId === 'hooded-blade');
 
     if (animName === 'run') {
       const dx = targetPos.x - characterOffset.x;
@@ -114,46 +115,94 @@ document.addEventListener('DOMContentLoaded', async () => {
         characterOffset.x = Math.max(-200, Math.min(200, characterOffset.x + stepX));
         characterOffset.y = Math.max(-80, Math.min(80, characterOffset.y + stepY));
       } else {
-        // Arrived at destination or finished sprint!
-        // Randomly pick next action: Kick (40%), Punch (40%), Idle (20%)
         const roll = Math.random() * 100;
-        if (roll < 40) {
-          controller.play('kick');
-        } else if (roll < 80) {
-          controller.play('punch');
+        if (isBlade) {
+          if (roll < 35) controller.play('sword-power');
+          else if (roll < 60) controller.play('attack');
+          else {
+            idleCountdown = Math.floor(Math.random() * 180 + 160); // 7 to 14 seconds of rest
+            controller.play('idle');
+          }
         } else {
-          idleCountdown = Math.floor(Math.random() * 50 + 30);
-          controller.play('idle');
+          if (roll < 35) controller.play('kick');
+          else if (roll < 60) controller.play('punch');
+          else {
+            idleCountdown = Math.floor(Math.random() * 180 + 160);
+            controller.play('idle');
+          }
         }
       }
     } else if (animName === 'idle') {
       idleCountdown--;
       if (idleCountdown <= 0) {
-        // Pick random next action
         const roll = Math.random() * 100;
-        if (roll < 55) {
+        if (roll < 18) { // Only 18% run chance
           pickNewRunDestination();
           controller.play('run');
-        } else if (roll < 80) {
+        } else if (roll < 58) {
+          // 40% chance: continue resting in idle
+          idleCountdown = Math.floor(Math.random() * 160 + 140);
+        } else if (isBlade) {
           facingLeft = Math.random() < 0.5;
-          controller.play('kick');
+          if (roll < 80) controller.play('sword-power');
+          else if (roll < 92) controller.play('attack');
+          else controller.play('jump');
         } else {
           facingLeft = Math.random() < 0.5;
-          controller.play('punch');
+          if (roll < 80) controller.play('kick');
+          else controller.play('punch');
         }
       }
     }
   }
 
-  function updateActionButtons(activeName) {
+  function renderActionButtons() {
+    actionButtonsContainer.innerHTML = '';
+    const isBlade = (activeCharacterId === 'hooded-blade');
+
+    const buttonDefs = isBlade ? [
+      { id: 'sword-power', label: '⚡ Sword Power', primary: true },
+      { id: 'attack', label: '🗡️ Sword Slash' },
+      { id: 'jump', label: '🦘 Leap Jump' },
+      { id: 'run', label: '🏃 Run Sprint' },
+      { id: 'idle', label: '🧍 Idle Stance' }
+    ] : [
+      { id: 'kick', label: '🥋 Kick Action', primary: true },
+      { id: 'punch', label: '🥊 Punch Action' },
+      { id: 'run', label: '🏃 Run Sprint' },
+      { id: 'idle', label: '🧍 Idle Stance' }
+    ];
+
+    actionHint.innerHTML = isBlade
+      ? '* Note: <strong>Sword Power</strong> charges and unleashes an emerald shockwave, smoothly transitioning back to <strong>Idle</strong>.'
+      : '* Note: <strong>Kick</strong> and <strong>Punch</strong> smoothly transition back to <strong>Idle</strong> upon completion.';
+
+    for (const def of buttonDefs) {
+      const btn = document.createElement('button');
+      btn.id = `btnAct_${def.id}`;
+      btn.textContent = def.label;
+      if (def.primary) btn.classList.add('primary');
+      if (def.id === 'idle') btn.classList.add('active-anim');
+
+      btn.addEventListener('click', () => {
+        if (def.id === 'run') pickNewRunDestination();
+        controller.play(def.id);
+      });
+      actionButtonsContainer.appendChild(btn);
+    }
+  }
+
+  function updateActionButtonsHighlight(activeName) {
     currentAnimBadge.textContent = activeName.toUpperCase();
-    for (const [name, btn] of Object.entries(actionButtons)) {
-      if (name === activeName) {
+    const buttons = actionButtonsContainer.querySelectorAll('button');
+    buttons.forEach(btn => {
+      if (btn.id === `btnAct_${activeName}`) {
         btn.classList.add('active-anim');
       } else {
         btn.classList.remove('active-anim');
       }
-    }
+    });
+
     const anim = controller.getAnimation(activeName);
     if (anim) {
       chkLoop.checked = anim.loop;
@@ -163,32 +212,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function switchActiveCharacter(charId) {
+    if (!config.characters || !config.characters[charId]) return;
+    activeCharacterId = charId;
+    activeCharDef = config.characters[charId];
+    charSelect.value = charId;
+
+    metaChar.textContent = activeCharDef.name;
+    controller.loadConfig(activeCharDef);
+    renderActionButtons();
+
+    idleCountdown = Math.floor(Math.random() * 25 + 20);
+    controller.play(activeCharDef.defaultAnimation || 'idle');
+  }
+
   // Draw current frame on canvas
   function renderFrame(frameData) {
     if (!frameData) return;
     const { animationName, frameIndex, sequenceIndex, totalSequenceFrames, meta, anchor } = frameData;
 
-    // Run autonomous tick if enabled
     handleAutonomousLogic();
 
-    // Clear canvas completely to preserve transparency
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const img = imageCache.get(`${animationName}:${frameIndex}`);
+    const img = imageCache.get(`${activeCharacterId}:${animationName}:${frameIndex}`);
     if (img) {
       ctx.save();
-      // Apply pet dragging / wandering offset
       ctx.translate(characterOffset.x + canvas.width / 2, characterOffset.y + canvas.height / 2);
-
-      // Apply horizontal facing direction
       ctx.scale(facingLeft ? -1 : 1, 1);
-
-      // Draw centered around the middle of canvas
       ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
 
-      // Render Debug overlay if enabled
       if (showDebug && meta) {
-        // Ground Baseline
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -196,27 +250,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.lineTo(canvas.width / 2, anchor.y - canvas.height / 2);
         ctx.stroke();
 
-        // Anchor Crosshair
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(anchor.x - canvas.width / 2, anchor.y - canvas.height / 2, 6, 0, Math.PI * 2);
         ctx.stroke();
-
-        // Content Bounding Box
-        ctx.strokeStyle = '#34d399';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-          meta.contentBox.minX - canvas.width / 2,
-          meta.contentBox.minY - canvas.height / 2,
-          meta.contentBox.width,
-          meta.contentBox.height
-        );
       }
       ctx.restore();
     }
 
-    // Update UI info
     lblFrame.textContent = `${sequenceIndex + 1} / ${totalSequenceFrames}`;
     const duration = (totalSequenceFrames / (controller.currentAnimation?.fps || 24)).toFixed(1);
     const currentTime = (sequenceIndex / (controller.currentAnimation?.fps || 24)).toFixed(2);
@@ -225,54 +267,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     metaAnim.textContent = animationName;
     metaFile.textContent = meta ? meta.file : `frame_${frameIndex}.png`;
     metaBaseline.textContent = `y = ${anchor.y} px`;
-    metaAnchor.textContent = `x = ${anchor.x}, y = ${anchor.y}`;
-    if (meta && meta.contentBox) {
-      metaBox.textContent = `${meta.contentBox.width} × ${meta.contentBox.height} px`;
-    }
   }
 
-  // Controller event listeners
-  controller.on('frameChange', frameData => {
-    renderFrame(frameData);
+  controller.on('frameChange', frameData => renderFrame(frameData));
+  controller.on('animationStart', e => updateActionButtonsHighlight(e.animation));
+
+  charSelect.addEventListener('change', e => {
+    switchActiveCharacter(e.target.value);
   });
 
-  controller.on('animationStart', e => {
-    updateActionButtons(e.animation);
-  });
-
-  controller.on('animationComplete', e => {
-    if (e.animation === 'kick' || e.animation === 'punch') {
-      // After kick or punch finishes, set idle duration before next autonomous action
-      idleCountdown = Math.floor(Math.random() * 50 + 30);
-    }
-  });
-
-  controller.on('transition', e => {
-    console.log(`Transitioning: ${e.from} -> ${e.to}`);
-  });
-
-  // Action Button Listeners
-  actionButtons.kick.addEventListener('click', () => {
-    controller.play('kick');
-  });
-
-  actionButtons.idle.addEventListener('click', () => {
-    controller.play('idle');
-  });
-
-  actionButtons.punch.addEventListener('click', () => {
-    controller.play('punch');
-  });
-
-  actionButtons.run.addEventListener('click', () => {
-    pickNewRunDestination();
-    controller.play('run');
-  });
-
-  // Click on canvas character to trigger Kick action!
+  // Click canvas character to trigger primary power action!
   canvas.addEventListener('click', () => {
     if (!isDragging) {
-      controller.play('kick');
+      if (activeCharacterId === 'hooded-blade') {
+        controller.play('sword-power');
+      } else {
+        controller.play('kick');
+      }
     }
   });
 
@@ -299,7 +310,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnPlayPause.textContent = '▶ Play';
   });
 
-  // Settings
   sliderFps.addEventListener('input', e => {
     const fps = parseInt(e.target.value, 10);
     lblFps.textContent = `${fps} FPS`;
@@ -308,7 +318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   sliderScale.addEventListener('input', e => {
     currentScale = parseFloat(e.target.value);
-    lblScale.textContent = `${currentScale.toFixed(1)}x (${Math.round(512 * currentScale)}x${Math.round(384 * currentScale)})`;
+    lblScale.textContent = `${currentScale.toFixed(1)}x (${Math.round(512 * currentScale)}x${Math.round(512 * currentScale)})`;
     canvas.style.transform = `scale(${currentScale})`;
   });
 
@@ -319,27 +329,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  chkLoop.addEventListener('change', e => {
-    controller.setLoop(e.target.checked);
-  });
-
+  chkLoop.addEventListener('change', e => controller.setLoop(e.target.checked));
   chkDebug.addEventListener('change', e => {
     showDebug = e.target.checked;
     renderFrame(controller.getCurrentFrameData());
   });
 
-  // Custom Sequence
   btnApplySeq.addEventListener('click', () => {
     const raw = txtSequence.value;
     const parts = raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
-    if (parts.length > 0) {
-      controller.setFrameSequence(parts);
-    }
+    if (parts.length > 0) controller.setFrameSequence(parts);
   });
 
   btnResetSeq.addEventListener('click', () => {
     if (controller.currentAnimation) {
-      const orig = config.animations[controller.currentAnimation.name];
+      const orig = activeCharDef.animations[controller.currentAnimation.name];
       if (orig) {
         controller.setFrameSequence(orig.frameSequence);
         txtSequence.value = orig.frameSequence.join(', ');
@@ -347,12 +351,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Backdrop switcher
   bgSelect.addEventListener('change', e => {
     stageWrapper.className = `stage-wrapper ${e.target.value}`;
   });
 
-  // Dragging character on stage
   canvas.addEventListener('mousedown', e => {
     isDragging = true;
     dragStart = { x: e.clientX - characterOffset.x, y: e.clientY - characterOffset.y };
@@ -370,20 +372,116 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => { isDragging = false; }, 50);
   });
 
-  // Keyboard controls
   window.addEventListener('keydown', e => {
-    if (e.code === 'Space' || e.key === 'k') {
-      controller.play('kick');
-    } else if (e.key === 'p') {
-      controller.play('punch');
-    } else if (e.key === 'r') {
+    if (e.key === 'c' || e.key === 'C') {
+      const nextChar = (activeCharacterId === 'hooded-blade') ? 'robot' : 'hooded-blade';
+      switchActiveCharacter(nextChar);
+    } else if (e.code === 'Space' || e.key === 's' || e.key === 'S') {
+      if (activeCharacterId === 'hooded-blade') controller.play('sword-power');
+      else controller.play('kick');
+    } else if (e.key === 'a' || e.key === 'A') {
+      if (activeCharacterId === 'hooded-blade') controller.play('attack');
+      else controller.play('punch');
+    } else if (e.key === 'j' || e.key === 'J') {
+      if (activeCharacterId === 'hooded-blade') controller.play('jump');
+    } else if (e.key === 'r' || e.key === 'R') {
       pickNewRunDestination();
       controller.play('run');
-    } else if (e.key === 'i') {
+    } else if (e.key === 'i' || e.key === 'I') {
       controller.play('idle');
     }
   });
 
-  // Start with Idle animation
-  controller.play('idle');
+  // Eye Health Elements
+  const eyeHealthBubble = document.getElementById('eyeHealthBubble');
+  const eyeHealthTitle = document.getElementById('eyeHealthTitle');
+  const eyeHealthText = document.getElementById('eyeHealthText');
+  const eyeHealthBar = document.getElementById('eyeHealthBar');
+  const eyeHealthCountdown = document.getElementById('eyeHealthCountdown');
+  const btnCloseEyeBubble = document.getElementById('btnCloseEyeBubble');
+  const btnTestEyeBreak = document.getElementById('btnTestEyeBreak');
+  const chkEyeHealth = document.getElementById('chkEyeHealth');
+  const lblNextEyeBreak = document.getElementById('lblNextEyeBreak');
+
+  // Eye Health State (20-20-20 Rule)
+  let eyeHealthEnabled = true;
+  let eyeBreakSecondsRemaining = 20 * 60; // 20 minutes
+  let isEyeBreakActive = false;
+  let eyeBreakSecondsLeft = 20;
+
+  function triggerEyeBreak() {
+    isEyeBreakActive = true;
+    eyeBreakSecondsLeft = 20;
+    const isBlade = (activeCharacterId === 'hooded-blade');
+
+    if (isBlade) {
+      eyeHealthBubble.style.borderColor = '#10b981';
+      eyeHealthTitle.style.color = '#10b981';
+      eyeHealthTitle.textContent = '🥷 Blade Master: Eye Care Stance';
+      eyeHealthText.textContent = '20 minutes of focus have passed! Rest your warrior vision — gaze at an object 20 feet into the horizon for 20 seconds to keep your sight razor sharp! 🍃';
+      eyeHealthBar.style.background = '#10b981';
+    } else {
+      eyeHealthBubble.style.borderColor = '#38bdf8';
+      eyeHealthTitle.style.color = '#38bdf8';
+      eyeHealthTitle.textContent = '🤖 Robot: Optical Health Protocol';
+      eyeHealthText.textContent = '20 minutes of screen time detected! Optical sensors recommend resting your human eyes: look 20 feet away for 20 seconds. 🔭';
+      eyeHealthBar.style.background = '#38bdf8';
+    }
+
+    eyeHealthBar.style.width = '100%';
+    eyeHealthCountdown.textContent = 'Looking 20ft away... 20s remaining';
+    eyeHealthBubble.classList.remove('hidden');
+    controller.play('idle');
+  }
+
+  function dismissEyeBreak() {
+    isEyeBreakActive = false;
+    eyeBreakSecondsRemaining = 20 * 60;
+    eyeHealthBubble.classList.add('hidden');
+  }
+
+  if (btnCloseEyeBubble) {
+    btnCloseEyeBubble.addEventListener('click', dismissEyeBreak);
+  }
+  if (btnTestEyeBreak) {
+    btnTestEyeBreak.addEventListener('click', triggerEyeBreak);
+  }
+  if (chkEyeHealth) {
+    chkEyeHealth.addEventListener('change', e => {
+      eyeHealthEnabled = e.target.checked;
+      if (!eyeHealthEnabled && isEyeBreakActive) dismissEyeBreak();
+    });
+  }
+
+  // 1-second interval for 20-20-20 eye health timer
+  setInterval(() => {
+    if (!eyeHealthEnabled) return;
+
+    if (isEyeBreakActive) {
+      eyeBreakSecondsLeft--;
+      if (eyeBreakSecondsLeft > 0) {
+        eyeHealthBar.style.width = `${(eyeBreakSecondsLeft / 20) * 100}%`;
+        eyeHealthCountdown.textContent = `Looking 20ft away... ${eyeBreakSecondsLeft}s remaining`;
+      } else {
+        eyeHealthBar.style.width = '0%';
+        eyeHealthCountdown.textContent = 'Eyes refreshed! Keep up the good work ✨';
+        setTimeout(dismissEyeBreak, 2000);
+      }
+      return;
+    }
+
+    eyeBreakSecondsRemaining--;
+    if (eyeBreakSecondsRemaining <= 0) {
+      triggerEyeBreak();
+    }
+
+    if (lblNextEyeBreak) {
+      const mins = Math.floor(eyeBreakSecondsRemaining / 60);
+      const secs = eyeBreakSecondsRemaining % 60;
+      lblNextEyeBreak.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+  }, 1000);
+
+  // Initialize UI
+  switchActiveCharacter(activeCharacterId);
 });

@@ -1,26 +1,44 @@
 <Window x:Class="DesktopPet.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Desktop Pet - Robot"
-        Width="256" Height="192"
+        Title="Desktop Pet - Character Studio &amp; Eye Care"
+        Width="320" Height="360"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="True"
         ResizeMode="NoResize"
+        Focusable="True"
         WindowStartupLocation="Manual"
         MouseDown="Window_MouseDown"
-        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+        MouseLeftButtonUp="Window_MouseLeftButtonUp"
+        MouseDoubleClick="Window_MouseDoubleClick">
     <Window.ContextMenu>
         <ContextMenu>
-            <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
+            <MenuItem Header="🥷 Switch to Hooded Blade (Sword Master)" Click="MenuCharHoodedBlade_Click" IsChecked="True" x:Name="MenuItemCharHoodedBlade" FontWeight="Bold" />
+            <MenuItem Header="🤖 Switch to Robot Pet" Click="MenuCharRobot_Click" x:Name="MenuItemCharRobot" />
             <Separator />
-            <MenuItem Header="Manual Actions">
-                <MenuItem Header="Kick Action (Space / Click)" Click="MenuKick_Click" />
-                <MenuItem Header="Punch Action (P)" Click="MenuPunch_Click" />
-                <MenuItem Header="Run Sprint (R)" Click="MenuRun_Click" />
-                <MenuItem Header="Idle Stance (I)" Click="MenuIdle_Click" />
+            <MenuItem Header="⚡ Sword Power (Space / Click)" Click="MenuPower_Click" x:Name="MenuItemPower" FontWeight="Bold" />
+            <MenuItem Header="🗡️ Sword Slash (A)" Click="MenuAttack_Click" x:Name="MenuItemAttack" />
+            <MenuItem Header="🦘 Leap Jump (J)" Click="MenuJump_Click" x:Name="MenuItemJump" />
+            <MenuItem Header="🏃 Run Sprint (R)" Click="MenuRun_Click" />
+            <MenuItem Header="🧍 Idle Stance (I)" Click="MenuIdle_Click" />
+            <Separator />
+            <MenuItem Header="👁️ Eye Health Care (20-20-20 Rule)">
+                <MenuItem Header="✅ Reminder Active (Every 20 Mins)" IsCheckable="True" IsChecked="True" Click="MenuEyeHealthToggle_Click" x:Name="MenuItemEyeHealthEnabled" FontWeight="Bold" />
+                <MenuItem Header="🔔 Remind Now (Test Alert Bubble)" Click="MenuEyeHealthTest_Click" FontWeight="SemiBold" />
+                <Separator />
+                <MenuItem Header="⏱️ Every 20 Minutes (Recommended)" Click="MenuEyeInterval20_Click" IsChecked="True" x:Name="MenuItemEyeInterval20" />
+                <MenuItem Header="⏱️ Every 30 Minutes" Click="MenuEyeInterval30_Click" x:Name="MenuItemEyeInterval30" />
+                <MenuItem Header="⏱️ Every 45 Minutes" Click="MenuEyeInterval45_Click" x:Name="MenuItemEyeInterval45" />
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="Autonomous Roaming &amp; Actions" IsCheckable="True" IsChecked="True" Click="MenuAutonomous_Click" x:Name="MenuItemAutonomous" FontWeight="Bold" />
+            <MenuItem Header="Roaming Activity">
+                <MenuItem Header="🌱 Chill &amp; Relaxed (Calm, rare running)" Click="MenuPaceCalm_Click" IsChecked="True" x:Name="MenuItemPaceCalm" />
+                <MenuItem Header="⚡ Active (More frequent movement)" Click="MenuPaceActive_Click" x:Name="MenuItemPaceActive" />
+                <MenuItem Header="🛑 Sit Still (No running)" Click="MenuPaceStill_Click" x:Name="MenuItemPaceStill" />
             </MenuItem>
             <Separator />
             <MenuItem Header="Frame Rate">
@@ -30,22 +48,88 @@
                 <MenuItem Header="48 FPS (Double Speed)" Click="MenuFps48_Click" />
             </MenuItem>
             <MenuItem Header="Pet Scale">
-                <MenuItem Header="Small (256x192)" Click="MenuScaleSmall_Click" IsChecked="True" x:Name="MenuItemScaleSmall" />
-                <MenuItem Header="Medium (384x288)" Click="MenuScaleMedium_Click" x:Name="MenuItemScaleMedium" />
-                <MenuItem Header="Original (512x384)" Click="MenuScaleOriginal_Click" x:Name="MenuItemScaleOriginal" />
+                <MenuItem Header="Small (256x256)" Click="MenuScaleSmall_Click" IsChecked="True" x:Name="MenuItemScaleSmall" />
+                <MenuItem Header="Medium (384x384)" Click="MenuScaleMedium_Click" x:Name="MenuItemScaleMedium" />
+                <MenuItem Header="Original (512x512)" Click="MenuScaleOriginal_Click" x:Name="MenuItemScaleOriginal" />
             </MenuItem>
             <MenuItem Header="Always on Top" IsCheckable="True" IsChecked="True" Click="MenuTopmost_Click" x:Name="MenuItemTopmost" />
             <Separator />
+            <MenuItem Header="📺 Send to Next Display (M)" Click="MenuNextScreen_Click" FontWeight="SemiBold" />
             <MenuItem Header="Reset to Screen Center" Click="MenuResetPos_Click" />
             <MenuItem Header="Exit Desktop Pet" Click="MenuExit_Click" />
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Grid Background="Transparent" ToolTip="Robot Pet: Roams, kicks, punches &amp; runs randomly! Left-click to kick. Drag to reposition.">
+    <Grid Background="Transparent" x:Name="RootGrid" ToolTip="Desktop Pet: Double-click to switch character. Press 'M' to switch screens. Right-click for options.">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Eye Health Speech Bubble / Thought Cloud -->
+        <Border x:Name="EyeHealthBubble"
+                Grid.Row="0"
+                Margin="8,4,8,6"
+                Padding="12,10"
+                CornerRadius="14"
+                Background="#F00F172A"
+                BorderBrush="#10B981"
+                BorderThickness="1.5"
+                Visibility="Collapsed"
+                Opacity="0"
+                Cursor="Hand"
+                MouseLeftButtonDown="EyeHealthBubble_Click"
+                ToolTip="Click to dismiss eye break">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.65" Color="#000000" />
+            </Border.Effect>
+            <StackPanel>
+                <!-- Header with Icon, Title and Close Button -->
+                <Grid Margin="0,0,0,6">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="👁️" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="20-20-20 Eye Health Break" FontSize="12" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" x:Name="EyeHealthHeader" />
+                    </StackPanel>
+                    <TextBlock Text="✕" FontSize="13" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand" ToolTip="Dismiss" />
+                </Grid>
+
+                <!-- Message with Character Personality -->
+                <TextBlock x:Name="EyeHealthMessage"
+                           Text="20 minutes passed! Look at an object 20 feet away for 20 seconds to relax your eyes."
+                           FontSize="11"
+                           Foreground="#F1F5F9"
+                           TextWrapping="Wrap"
+                           LineHeight="15"
+                           Margin="0,0,0,8" />
+
+                <!-- Countdown & Progress Bar -->
+                <Grid Margin="0,0,0,2">
+                    <ProgressBar x:Name="EyeHealthProgress"
+                                 Height="5"
+                                 Minimum="0"
+                                 Maximum="20"
+                                 Value="20"
+                                 Foreground="#10B981"
+                                 Background="#334155"
+                                 BorderThickness="0" />
+                </Grid>
+                <TextBlock x:Name="EyeHealthCountdown"
+                           Text="Looking away... 20s remaining"
+                           FontSize="10"
+                           Foreground="#94A3B8"
+                           HorizontalAlignment="Right"
+                           Margin="0,3,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- Character Sprite Image -->
         <Image x:Name="PetImage"
+               Grid.Row="1"
+               Width="256"
+               Height="256"
                Stretch="Uniform"
                HorizontalAlignment="Center"
-               VerticalAlignment="Center"
+               VerticalAlignment="Bottom"
                RenderOptions.BitmapScalingMode="HighQuality"
                RenderTransformOrigin="0.5, 0.5">
             <Image.RenderTransform>

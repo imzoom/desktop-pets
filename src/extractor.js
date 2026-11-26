@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { applySwordPowerFx } = require('./sword-power-fx');
 
 // CRC32 table for PNG generation
 const crcTable = new Uint32Array(256);
@@ -108,10 +109,10 @@ function encodePNG(width, height, rgbaBuffer) {
 }
 
 /**
- * Inspects a spritesheet and extracts non-empty, aligned frames.
+ * Extracts frames from grid-based spritesheet (Robot)
  */
-function extractSpritesheet(spritesheetPath, outputDir, animConfig) {
-  console.log(`\nProcessing: ${path.basename(spritesheetPath)}...`);
+function extractGridSpritesheet(spritesheetPath, outputDir, animConfig) {
+  console.log(`\nProcessing Grid Sheet: ${path.basename(spritesheetPath)}...`);
   const img = decodePNG(spritesheetPath);
   const cellW = animConfig.cellWidth || 512;
   const cellH = animConfig.cellHeight || 384;
@@ -127,7 +128,6 @@ function extractSpritesheet(spritesheetPath, outputDir, animConfig) {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      // Analyze this cell
       let minX = cellW, maxX = -1, minY = cellH, maxY = -1, count = 0;
       let sumX = 0, sumY = 0;
       const cellPixels = Buffer.alloc(cellW * cellH * 4);
@@ -161,7 +161,6 @@ function extractSpritesheet(spritesheetPath, outputDir, animConfig) {
         }
       }
 
-      // If cell has meaningful content (> 100 non-transparent pixels)
       if (count > 100) {
         const frameFileName = `frame_${String(frameIndex).padStart(3, '0')}.png`;
         const frameFilePath = path.join(outputDir, frameFileName);
@@ -191,7 +190,89 @@ function extractSpritesheet(spritesheetPath, outputDir, animConfig) {
     }
   }
 
-  console.log(`  Extracted ${framesMeta.length} individual transparent frames to ${outputDir}`);
+  console.log(`  Extracted ${framesMeta.length} frames to ${outputDir}`);
+  return framesMeta;
+}
+
+/**
+ * Extracts frames from JSON metadata spritesheet (Hooded Blade)
+ */
+function extractJsonSpritesheet(spritesheetPath, jsonPath, outputDir, animConfig, fxTransformer = null) {
+  console.log(`\nProcessing JSON Sheet: ${path.basename(spritesheetPath)}...`);
+  const img = decodePNG(spritesheetPath);
+  const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const framesMeta = [];
+  const entries = Object.entries(jsonData.frames);
+
+  for (let i = 0; i < entries.length; i++) {
+    const [key, f] = entries[i];
+    const cellW = f.w;
+    const cellH = f.h;
+    let cellPixels = Buffer.alloc(cellW * cellH * 4);
+
+    let minX = cellW, maxX = -1, minY = cellH, maxY = -1, count = 0;
+    let sumX = 0, sumY = 0;
+
+    for (let y = 0; y < cellH; y++) {
+      for (let x = 0; x < cellW; x++) {
+        const gx = f.x + x;
+        const gy = f.y + y;
+        const srcIdx = (gy * img.width + gx) * 4;
+        const dstIdx = (y * cellW + x) * 4;
+
+        const red = img.pixels[srcIdx];
+        const green = img.pixels[srcIdx + 1];
+        const blue = img.pixels[srcIdx + 2];
+        const alpha = img.pixels[srcIdx + 3];
+
+        cellPixels[dstIdx] = red;
+        cellPixels[dstIdx + 1] = green;
+        cellPixels[dstIdx + 2] = blue;
+        cellPixels[dstIdx + 3] = alpha;
+
+        if (alpha > 10) {
+          count++;
+          sumX += x;
+          sumY += y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    // Apply special visual FX if transformer provided (e.g. Sword Power energy slash!)
+    if (fxTransformer) {
+      cellPixels = fxTransformer(cellPixels, i, cellW, cellH);
+    }
+
+    const frameFileName = `frame_${String(i).padStart(3, '0')}.png`;
+    const frameFilePath = path.join(outputDir, frameFileName);
+    const pngBuf = encodePNG(cellW, cellH, cellPixels);
+    fs.writeFileSync(frameFilePath, pngBuf);
+
+    framesMeta.push({
+      index: i,
+      file: frameFileName,
+      sourceRect: { x: f.x, y: f.y, width: cellW, height: cellH },
+      contentBox: {
+        minX, maxX, minY, maxY,
+        width: maxX - minX + 1,
+        height: maxY - minY + 1
+      },
+      center: { x: count > 0 ? +(sumX / count).toFixed(1) : cellW / 2, y: count > 0 ? +(sumY / count).toFixed(1) : cellH / 2 },
+      groundBaseline: maxY,
+      pixelCount: count
+    });
+  }
+
+  console.log(`  Extracted ${framesMeta.length} frames to ${outputDir}`);
   return framesMeta;
 }
 
@@ -200,8 +281,8 @@ function runExtraction() {
   const imagesDir = path.join(baseDir, 'images');
   const outputBase = path.join(baseDir, 'extracted_frames');
 
-  // Animation specifications
-  const animationsDef = {
+  // Character 1: Robot Pet Definitions
+  const robotAnimations = {
     idle: {
       name: 'idle',
       sourceFile: path.join(imagesDir, 'idle-spritesheet.png'),
@@ -210,7 +291,7 @@ function runExtraction() {
       fps: 24,
       loop: true,
       nextAnimation: null,
-      description: 'Default idle robot breathing and stance animation'
+      description: 'Default idle robot breathing and stance'
     },
     kick: {
       name: 'kick',
@@ -220,7 +301,7 @@ function runExtraction() {
       fps: 24,
       loop: false,
       nextAnimation: 'idle',
-      description: 'Dynamic martial arts kick action, smoothly transitioning back to idle'
+      description: 'Dynamic martial arts kick action'
     },
     punch: {
       name: 'punch',
@@ -230,7 +311,7 @@ function runExtraction() {
       fps: 24,
       loop: false,
       nextAnimation: 'idle',
-      description: 'Forward punch strike action, smoothly transitioning back to idle'
+      description: 'Forward punch strike action'
     },
     run: {
       name: 'run',
@@ -244,32 +325,105 @@ function runExtraction() {
     }
   };
 
+  // Character 2: Hooded Blade (Sword Master) Definitions
+  const hoodedBladeAnimations = {
+    idle: {
+      name: 'idle',
+      sourceFile: path.join(imagesDir, 'hooded-blade-idle.png'),
+      jsonFile: path.join(imagesDir, 'hooded-blade-idle.json'),
+      cellWidth: 512,
+      cellHeight: 512,
+      fps: 24,
+      loop: true,
+      nextAnimation: null,
+      description: 'Ninja blade master ready stance'
+    },
+    run: {
+      name: 'run',
+      sourceFile: path.join(imagesDir, 'hooded-blade-run.png'),
+      jsonFile: path.join(imagesDir, 'hooded-blade-run.json'),
+      cellWidth: 512,
+      cellHeight: 512,
+      fps: 24,
+      loop: true,
+      nextAnimation: null,
+      description: 'Ninja sprint with drawn glowing blade'
+    },
+    attack: {
+      name: 'attack',
+      sourceFile: path.join(imagesDir, 'hooded-blade-attack.png'),
+      jsonFile: path.join(imagesDir, 'hooded-blade-attack.json'),
+      cellWidth: 512,
+      cellHeight: 512,
+      fps: 24,
+      loop: false,
+      nextAnimation: 'idle',
+      description: 'Quick sword slash combo'
+    },
+    'sword-power': {
+      name: 'sword-power',
+      sourceFile: path.join(imagesDir, 'hooded-blade-attack.png'),
+      jsonFile: path.join(imagesDir, 'hooded-blade-attack.json'),
+      cellWidth: 512,
+      cellHeight: 512,
+      fps: 24,
+      loop: false,
+      nextAnimation: 'idle',
+      fxTransformer: applySwordPowerFx,
+      description: 'Unleashed Sword Power: Charging aura and blazing emerald energy wave slash!'
+    },
+    jump: {
+      name: 'jump',
+      sourceFile: path.join(imagesDir, 'hooded-blade-jump.png'),
+      jsonFile: path.join(imagesDir, 'hooded-blade-jump.json'),
+      cellWidth: 512,
+      cellHeight: 512,
+      fps: 16,
+      loop: false,
+      nextAnimation: 'idle',
+      description: 'High acrobatic leap jump'
+    }
+  };
+
+  // Multi-character configuration system
   const fullConfig = {
-    version: '1.0.0',
-    character: 'RobotPet',
-    globalAnchor: {
-      // The shared anchor/pivot point across all animations
-      // Anchor (220, 320) aligns the ground contact floor and torso center
-      x: 220,
-      y: 320
+    version: '2.0.0',
+    defaultCharacter: 'hooded-blade',
+    characters: {
+      robot: {
+        id: 'robot',
+        name: 'Robot Pet',
+        description: 'Bipedal combat robot with kick, punch, and sprint abilities',
+        frameDimensions: { width: 512, height: 384 },
+        globalAnchor: { x: 220, y: 320 },
+        defaultAnimation: 'idle',
+        animations: {}
+      },
+      'hooded-blade': {
+        id: 'hooded-blade',
+        name: 'Hooded Blade',
+        description: 'Blade master with glowing sword, leap jump, and unleashed Sword Power',
+        frameDimensions: { width: 512, height: 512 },
+        globalAnchor: { x: 256, y: 465 },
+        defaultAnimation: 'idle',
+        animations: {}
+      }
     },
-    frameDimensions: {
-      width: 512,
-      height: 384
-    },
+    // Backwards compatibility mappings for original single-character readers
+    globalAnchor: { x: 256, y: 465 },
+    frameDimensions: { width: 512, height: 512 },
     defaultAnimation: 'idle',
     animations: {}
   };
 
-  for (const [key, anim] of Object.entries(animationsDef)) {
-    if (!fs.existsSync(anim.sourceFile)) {
-      console.warn(`Source file not found: ${anim.sourceFile}, skipping.`);
-      continue;
-    }
-    const animOutputDir = path.join(outputBase, key);
-    const frames = extractSpritesheet(anim.sourceFile, animOutputDir, anim);
+  // 1. Extract Robot
+  console.log('=== EXTRACTING ROBOT CHARACTER ===');
+  for (const [key, anim] of Object.entries(robotAnimations)) {
+    if (!fs.existsSync(anim.sourceFile)) continue;
+    const animOutputDir = path.join(outputBase, 'robot', key);
+    const frames = extractGridSpritesheet(anim.sourceFile, animOutputDir, anim);
 
-    fullConfig.animations[key] = {
+    fullConfig.characters.robot.animations[key] = {
       name: anim.name,
       description: anim.description,
       fps: anim.fps,
@@ -278,14 +432,39 @@ function runExtraction() {
       nextAnimation: anim.nextAnimation,
       totalFrames: frames.length,
       frameSequence: frames.map(f => f.index),
-      framesDir: `extracted_frames/${key}`,
+      framesDir: `extracted_frames/robot/${key}`,
       frames: frames
     };
   }
 
+  // 2. Extract Hooded Blade
+  console.log('\n=== EXTRACTING HOODED BLADE CHARACTER & SWORD POWER ===');
+  for (const [key, anim] of Object.entries(hoodedBladeAnimations)) {
+    if (!fs.existsSync(anim.sourceFile) || !fs.existsSync(anim.jsonFile)) continue;
+    const animOutputDir = path.join(outputBase, 'hooded-blade', key);
+    const frames = extractJsonSpritesheet(anim.sourceFile, anim.jsonFile, animOutputDir, anim, anim.fxTransformer);
+
+    fullConfig.characters['hooded-blade'].animations[key] = {
+      name: anim.name,
+      description: anim.description,
+      fps: anim.fps,
+      durationMs: Math.round((frames.length / anim.fps) * 1000),
+      loop: anim.loop,
+      nextAnimation: anim.nextAnimation,
+      totalFrames: frames.length,
+      frameSequence: frames.map(f => f.index),
+      framesDir: `extracted_frames/hooded-blade/${key}`,
+      frames: frames
+    };
+  }
+
+  // Set default top-level animations pointing to hooded-blade for backwards compat
+  fullConfig.animations = fullConfig.characters['hooded-blade'].animations;
+
   const configPath = path.join(baseDir, 'animation-config.json');
   fs.writeFileSync(configPath, JSON.stringify(fullConfig, null, 2));
-  console.log(`\nSuccessfully generated animation configuration: ${configPath}`);
+
+  console.log(`\n🎉 Generated configuration for both characters: ${configPath}`);
   return fullConfig;
 }
 
@@ -296,6 +475,5 @@ if (require.main === module) {
 module.exports = {
   decodePNG,
   encodePNG,
-  extractSpritesheet,
   runExtraction
 };
