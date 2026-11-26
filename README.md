@@ -65,7 +65,28 @@ C:\Jay\Demos\dextop-pets\
 
 ---
 
-## 🎮 How to Run
+## 📦 Zero-Dependency Standalone Release (Runs on ANY Windows PC)
+
+No .NET runtime or SDK required on target machines! The standalone executable bundles the complete runtime and embedded assets:
+
+### Option 1: Direct Single-File Executable
+You can copy and run `DesktopPet.exe` directly on any Windows 10/11 x64 PC:
+- Path: `release\DesktopPet-Standalone-win-x64\DesktopPet.exe`
+- **Zero installation**: Double-click to run. No .NET runtime needed!
+
+### Option 2: Ready-to-Share ZIP Archive
+- Path: `release\DesktopPet-Standalone-Win64.zip`
+- Extract anywhere and double-click `DesktopPet.exe`.
+
+### How to Rebuild the Standalone Release:
+```powershell
+cd C:\Jay\Demos\dextop-pets\desktop-pet-win
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "..\release\DesktopPet-Standalone-win-x64"
+```
+
+---
+
+## 🎮 How to Run (Development Mode)
 
 ### Native Windows Desktop Pet (Floating on Desktop)
 ```powershell

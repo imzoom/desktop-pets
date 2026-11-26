@@ -464,16 +464,6 @@ function runExtraction() {
   const configPath = path.join(baseDir, 'animation-config.json');
   fs.writeFileSync(configPath, JSON.stringify(fullConfig, null, 2));
 
-  // Also sync to C:\Jay\CoreDemo\desktop-pets if accessible
-  try {
-    const coreDemoConfig = 'C:\\Jay\\CoreDemo\\desktop-pets\\animation-config.json';
-    if (fs.existsSync('C:\\Jay\\CoreDemo\\desktop-pets')) {
-      fs.writeFileSync(coreDemoConfig, JSON.stringify(fullConfig, null, 2));
-    }
-  } catch (err) {
-    // Ignore outside-workspace permission in sandbox
-  }
-
   console.log(`\n🎉 Generated configuration for both characters: ${configPath}`);
   return fullConfig;
 }
